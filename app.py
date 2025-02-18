@@ -146,6 +146,11 @@ with tabs[0]:
             ["Confident & Calm", "Fearful", "Excited", "FOMO", "Revenge Trading Urge"]
         )
         
+        # Calculate position size for closed trades
+        position_size = None
+        if entry_price and stop_loss and initial_capital and risk_percent:
+            position_size = calculate_position_size(initial_capital, risk_percent, entry_price, stop_loss)
+
         # Show charges calculation for closed trades
         if status == "Closed" and entry_price and exit_price and position_size:
             st.subheader("Charges Breakdown")
