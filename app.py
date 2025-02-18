@@ -1,11 +1,7 @@
-# ... keep existing code (imports)
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import plotly.graph_objects as go
 import plotly.express as px
-import numpy as np
-from io import BytesIO
 import base64
 
 # Set page config
@@ -30,28 +26,17 @@ def calculate_pnl(position_size, entry_price, exit_price):
     return position_size * (exit_price - entry_price)
 
 def calculate_charges(position_size, entry_price, exit_price, trade_type):
-    # Calculate turnover
     turnover = position_size * (entry_price + exit_price)
+    brokerage = min(turnover * 0.0003, 40)
     
-    # Brokerage (example: 0.03% or minimum ₹20 per order)
-    brokerage = min(turnover * 0.0003, 40)  # For both buy and sell combined
-    
-    # Securities Transaction Tax (STT)
     if trade_type in ["Call Option", "Put Option"]:
-        stt = (position_size * exit_price) * 0.0005  # 0.05% on sell side for options
+        stt = (position_size * exit_price) * 0.0005
     else:
-        stt = turnover * 0.0001  # 0.01% for equity delivery
+        stt = turnover * 0.0001
 
-    # Exchange Transaction Charges (0.00325%)
     transaction_charges = turnover * 0.0000325
-    
-    # GST (18% on brokerage and transaction charges)
     gst = (brokerage + transaction_charges) * 0.18
-    
-    # Stamp Duty (0.003% on buy side)
     stamp_duty = (position_size * entry_price) * 0.00003
-    
-    # Calculate total charges
     total_charges = brokerage + stt + transaction_charges + gst + stamp_duty
     
     return {
@@ -245,6 +230,15 @@ with tabs[1]:
                     if trade['exit_screenshot'] and trade['status'] == 'Closed':
                         st.write("**Exit Screenshot**")
                         st.image(base64.b64decode(trade['exit_screenshot']), use_column_width=True)
+
+        # Download CSV button
+        csv = st.session_state.trades.to_csv(index=False)
+        st.download_button(
+            label="Download Trade Journal as CSV",
+            data=csv,
+            file_name='trade_journal.csv',
+            mime='text/csv',
+        )
 
 with tabs[2]:
     st.header("📊 Analytics Dashboard")
