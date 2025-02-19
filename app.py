@@ -185,12 +185,11 @@ with tabs[0]:
         st.subheader("📸 Trade Screenshots")
         entry_screenshot = st.file_uploader("Entry Screenshot", type=['png', 'jpg', 'jpeg'])
         exit_screenshot = st.file_uploader("Exit Screenshot", type=['png', 'jpg', 'jpeg'])
-       
-        if entry_screenshot:
-            st.image(entry_screenshot, caption="Entry Setup", use_column_width=True)
-        if exit_screenshot:
-            st.image(exit_screenshot, caption="Exit Setup", use_column_width=True)
 
+        if entry_screenshot:
+            st.image(entry_screenshot, caption="Entry Setup", use_container_width=True)  # Updated here
+        if exit_screenshot:
+            st.image(exit_screenshot, caption="Exit Setup", use_container_width=True)  # Updated here
     with col2:
         # Trade Details
         st.subheader("Trade Details")
@@ -310,7 +309,8 @@ with tabs[1]:
                    
                     if trade['entry_screenshot']:
                         st.write("**Entry Screenshot**")
-                        st.image(base64.b64decode(trade['entry_screenshot']), use_column_width=True)
+                        st.image(base64.b64decode(trade['entry_screenshot']), use_container_width=True)  # Updated here
+
                
                 with trade_col2:
                     st.write("**Trade Analysis**")
@@ -321,8 +321,7 @@ with tabs[1]:
                    
                     if trade['exit_screenshot'] and trade['status'] == 'Closed':
                         st.write("**Exit Screenshot**")
-                        st.image(base64.b64decode(trade['exit_screenshot']), use_column_width=True)
-
+                        st.image(base64.b64decode(trade['exit_screenshot']), use_container_width=True)  # Updated here
         # Download CSV button
         csv = trades_df.to_csv(index=False)
         st.download_button(
