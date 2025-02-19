@@ -263,7 +263,7 @@ with tabs[1]:
                     
                     if trade['entry_screenshot']:
                         st.write("**Entry Screenshot**")
-                        st.image(trade['entry_screenshot'], use_column_width=True)
+                        st.image(io.BytesIO(trade['entry_screenshot']), use_column_width=True)
                 
                 with trade_col2:
                     st.write("**Trade Analysis**")
@@ -274,7 +274,7 @@ with tabs[1]:
                     
                     if trade['exit_screenshot'] and trade['status'] == 'Closed':
                         st.write("**Exit Screenshot**")
-                        st.image(trade['exit_screenshot'], use_column_width=True)
+                        st.image(io.BytesIO(trade['exit_screenshot']), use_column_width=True)
 
         # Download Excel button
         if st.button("Download Trade Journal as Excel"):
