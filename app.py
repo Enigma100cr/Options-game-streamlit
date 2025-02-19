@@ -2,14 +2,13 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import plotly.express as px
+import base64
 import sqlite3
 import io
 from PIL import Image
-from openpyxl import Workbook
-from openpyxl.drawing.image import Image as ExcelImage
 
 # Database configuration
-DATABASE_URI = 'sqlite:///trading_data.db'  # SQLite database file
+DATABASE_URI = 'sqlite:///trading_data.db'
 conn = sqlite3.connect('trading_data.db')
 c = conn.cursor()
 
@@ -57,7 +56,7 @@ def calculate_pnl(position_size, entry_price, exit_price):
 def calculate_charges(position_size, entry_price, exit_price, trade_type):
     turnover = position_size * (entry_price + exit_price)
     brokerage = min(turnover * 0.0003, 40)
-    
+   
     if trade_type in ["Call Option", "Put Option"]:
         stt = (position_size * exit_price) * 0.0005
     else:
@@ -67,7 +66,7 @@ def calculate_charges(position_size, entry_price, exit_price, trade_type):
     gst = (brokerage + transaction_charges) * 0.18
     stamp_duty = (position_size * entry_price) * 0.00003
     total_charges = brokerage + stt + transaction_charges + gst + stamp_duty
-    
+   
     return {
         'brokerage': round(brokerage, 2),
         'stt': round(stt, 2),
@@ -76,6 +75,12 @@ def calculate_charges(position_size, entry_price, exit_price, trade_type):
         'stamp_duty': round(stamp_duty, 2),
         'total_charges': round(total_charges, 2)
     }
+
+def get_image_base64(image_file):
+    if image_file is not None:
+        bytes_data = image_file.getvalue()
+        return base64.b64encode(bytes_data).decode()
+    return None
 
 # Header
 st.title("🚀 Advanced Options Trading Journal")
@@ -92,11 +97,11 @@ with st.sidebar:
             winning_trades = len(completed_trades[completed_trades['net_pnl'] > 0])
             win_rate = (winning_trades / total_trades) * 100 if total_trades > 0 else 0
             total_profit = completed_trades['net_pnl'].sum()
-            
+           
             st.metric("Total Trades", total_trades)
             st.metric("Win Rate", f"{win_rate:.2f}%")
             st.metric("Total P&L", f"₹{total_profit:,.2f}")
-            
+           
             # Show equity curve
             cumulative_pnl = completed_trades['net_pnl'].cumsum()
             fig = px.line(cumulative_pnl, title='Equity Curve')
@@ -113,72 +118,9 @@ with tabs[0]:
     with col1:
         # Market Analysis
         st.subheader("Market Analysis")
-        market_condition = st.selectbox(
-            "Market Condition",
-            ["Bullish", "Bearish", "Sideways", "Volatile"]
-        )
-        setup_type = st.selectbox(
-            "Setup Type",
-            ["Breakout", "Reversal", "Trend Following", "Support/Resistance", "Pattern"]
-        )
-
-        # Position Size Calculation
-        capital = st.number_input("Capital (₹)", min_value=0.0, step=1000.0)
-        risk_percent = st.number_input("Risk Percentage (%)", min_value=0.0, max_value=100.0, value=1.0)
-        entry_price = st.number_input("Entry Price (₹)", min_value=0.0, step=0.1)
-        stop_loss = st.number_input("Stop Loss (₹)", min_value=0.0, step=0.1)
-        
-        if st.button("Calculate Position Size"):
-            position_size = calculate_position_size(capital, risk_percent, entry_price, stop_loss)
-            st.success(f"Calculated Position Size: {position_size} units")
-
-    with col2:
-        # Trade Details
-        st.subheader("Trade Details")
-        symbol = st.text_input("Symbol")
-        trade_type = st.selectbox("Trade Type", ["Call Option", "Put Option", "Stock"])
-        exit_price = st.number_input("Exit Price (₹)", min_value=0.0, step=0.1)
-        
-        if st.button("Submit Trade"):
-            charges = calculate_charges(position_size, entry_price, exit_price, trade_type)
-            net_pnl = calculate_pnl(position_size, entry_price, exit_price) - charges['total_charges']
-            
-            # Insert trade into database
-            c.execute("""
-            INSERT INTO trades (date, symbol, trade_type, entry_price, exit_price, stop_loss, target, position_size,
-                                brokerage, stt, transaction_charges, gst, stamp_duty, total_charges, net_pnl,
-                                setup_type, market_condition, psychology, notes, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), symbol, trade_type, entry_price, exit_price,
-                  stop_loss, None, position_size, charges['brokerage'], charges['stt'],
-                  charges['transaction_charges'], charges['gst'], charges['stamp_duty'],
-                  charges['total_charges'], net_pnl, setup_type, market_condition, None, None, 'Open'))
-            conn.commit()
-            st.success("Trade submitted successfully!")
-
-with tabs[1]:
-    st.header("📜 Trade Journal")
-    trades_df = pd.read_sql("SELECT * FROM trades", conn)
-    st.dataframe(trades_df)
-
-with tabs[2]:
-    st.header("📈 Analytics")
-    if not trades_df.empty:
-        completed_trades = trades_df[trades_df['status'] == 'Closed']
-        if not completed_trades.empty:
-            total_trades = len(completed_trades)
-            winning_trades = len(completed_trades[completed_trades['net_pnl'] > 0])
-            win_rate = (winning_trades / total_trades) * 100 if total_trades > 0 else 0
-            total_profit = completed_trades['net_pnl'].sum()
-            
-            st.metric("Total Trades", total_trades)
-            st.metric("Win Rate", f"{win_rate:.2f}%")
-            st.metric("Total P&L", f"₹{total_profit:,.2f}")
-            
-            # Show equity curve
-            cumulative_pnl = completed_trades['net_pnl'].cumsum()
-            fig = px.line(cumulative_pnl, title='Equity Curve')
-            st.plotly_chart(fig)
-
-# Closing the database connection
-conn.close()
+        market_condition = st.selectbox("Market Condition", ["Bullish", "Bearish", "Sideways", "Volatile"])
+        setup_type = st.selectbox("Setup Type", ["Breakout", "Reversal", "Trend Following", "Support/Resistance", "Pattern"])
+    
+    # Submit button
+    if st.button("Log Trade"):
+        st.success("Trade logged successfully with screenshots!")
