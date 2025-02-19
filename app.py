@@ -6,6 +6,8 @@ import base64
 import sqlite3
 import io
 from PIL import Image
+from openpyxl import Workbook
+from openpyxl.drawing.image import Image as ExcelImage
 
 # Database configuration
 DATABASE_URI = 'sqlite:///trading_data.db'  # SQLite database file
@@ -196,9 +198,9 @@ with tabs[0]:
             }
             net_pnl = pnl - charges['total_charges'] if status == "Closed" else 0
             
-            # Convert screenshots to base64
-            entry_image = get_image_base64(entry_screenshot) if entry_screenshot else None
-            exit_image = get_image_base64(exit_screenshot) if exit_screenshot else None
+            # Convert screenshots to bytes
+            entry_image = entry_screenshot.read() if entry_screenshot else None
+            exit_image = exit_screenshot.read() if exit_screenshot else None
             
             # Add trade to database with screenshots
             new_trade = {
@@ -261,7 +263,7 @@ with tabs[1]:
                     
                     if trade['entry_screenshot']:
                         st.write("**Entry Screenshot**")
-                        st.image(base64.b64decode(trade['entry_screenshot']), use_column_width=True)
+                        st.image(trade['entry_screenshot'], use_column_width=True)
                 
                 with trade_col2:
                     st.write("**Trade Analysis**")
@@ -272,16 +274,35 @@ with tabs[1]:
                     
                     if trade['exit_screenshot'] and trade['status'] == 'Closed':
                         st.write("**Exit Screenshot**")
-                        st.image(base64.b64decode(trade['exit_screenshot']), use_column_width=True)
+                        st.image(trade['exit_screenshot'], use_column_width=True)
 
-        # Download CSV button
-        csv = trades_df.to_csv(index=False)
-        st.download_button(
-            label="Download Trade Journal as CSV",
-            data=csv,
-            file_name='trade_journal.csv',
-            mime='text/csv',
-        )
+        # Download Excel button
+        if st.button("Download Trade Journal as Excel"):
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Trade Journal"
+
+            # Add headers
+            headers = trades_df.columns.tolist()
+            ws.append(headers)
+
+            # Add data rows
+            for index, row in trades_df.iterrows():
+                ws.append(row.tolist())
+                # Add images
+                if row['entry_screenshot']:
+                    img = ExcelImage(io.BytesIO(row['entry_screenshot']))
+                    img.anchor = f'A{ws.max_row}'  # Position the image
+                    ws.add_image(img)
+                if row['exit_screenshot'] and row['status'] == 'Closed':
+                    img = ExcelImage(io.BytesIO(row['exit_screenshot']))
+                    img.anchor = f'B{ws.max_row}'  # Position the image
+                    ws.add_image(img)
+
+            # Save the workbook
+            excel_file = "trade_journal.xlsx"
+            wb.save(excel_file)
+            st.success(f"Trade journal downloaded as {excel_file}")
 
 with tabs[2]:
     st.header("📊 Analytics Dashboard")
