@@ -9,3 +9,8 @@ sqlalchemy
 pillow
 
 openpyxl
+
+
+
+
+sqlite3
