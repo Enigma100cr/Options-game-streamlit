@@ -11,13 +11,14 @@ from openpyxl.drawing.image import Image as ExcelImage
 
 # Database configuration
 DATABASE_URI = 'sqlite:///trading_data.db'  # SQLite database file
-conn = sqlite3.connect('trading_data.db')
+conn = sqlite3.connect(DATABASE_URI)
 c = conn.cursor()
 
 # Create a table for storing trade data if it doesn't exist
 c.execute("""
 CREATE TABLE IF NOT EXISTS trades (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT,
     date TEXT,
     symbol TEXT,
     trade_type TEXT,
@@ -85,12 +86,10 @@ def get_image_base64(image_file):
     return None
 
 def save_to_excel(trades_df):
-    # Create a new Excel workbook and select the active worksheet
     wb = Workbook()
     ws = wb.active
     ws.title = "Trade Journal"
 
-    # Define the header
     headers = [
         "Date", "Symbol", "Trade Type", "Entry Price", "Exit Price", "Stop Loss",
         "Target", "Position Size", "Brokerage", "STT", "Transaction Charges",
@@ -99,7 +98,6 @@ def save_to_excel(trades_df):
     ]
     ws.append(headers)
 
-    # Add trade data to the worksheet
     for index, trade in trades_df.iterrows():
         row = [
             trade['date'], trade['symbol'], trade['trade_type'], trade['entry_price'],
@@ -110,23 +108,20 @@ def save_to_excel(trades_df):
         ]
         ws.append(row)
 
-        # Add entry screenshot if available
         if trade['entry_screenshot']:
             entry_image = Image.open(io.BytesIO(base64.b64decode(trade['entry_screenshot'])))
             entry_image_path = f"entry_screenshot_{trade['id']}.png"
             entry_image.save(entry_image_path)
             img = ExcelImage(entry_image_path)
-            ws.add_image(img, f'T{ws.max_row}')  # Adjust the cell position as needed
+            ws.add_image(img, f'T{ws.max_row}')
 
-        # Add exit screenshot if available
         if trade['exit_screenshot']:
             exit_image = Image.open(io.BytesIO(base64.b64decode(trade['exit_screenshot'])))
             exit_image_path = f"exit_screenshot_{trade['id']}.png"
             exit_image.save(exit_image_path)
             img = ExcelImage(exit_image_path)
-            ws.add_image(img, f'U{ws.max_row}')  # Adjust the cell position as needed
+            ws.add_image(img, f'U{ws.max_row}')
 
-    # Save the workbook
     excel_file = "trade_journal.xlsx"
     wb.save(excel_file)
     return excel_file
@@ -138,7 +133,9 @@ st.markdown("Track your trades, analyze performance, and improve your psychology
 # Sidebar for analytics
 with st.sidebar:
     st.header("📊 Trading Statistics")
-    trades_df = pd.read_sql("SELECT * FROM trades", conn)
+    user_id = st.text_input("Enter User ID for Personalized Access", placeholder="User  ID")
+    trades_df = pd.read_sql("SELECT * FROM trades WHERE user_id = ?", conn, params=(user_id,))
+    
     if not trades_df.empty:
         completed_trades = trades_df[trades_df['status'] == 'Closed']
         if not completed_trades.empty:
@@ -187,9 +184,10 @@ with tabs[0]:
         exit_screenshot = st.file_uploader("Exit Screenshot", type=['png', 'jpg', 'jpeg'])
 
         if entry_screenshot:
-            st.image(entry_screenshot, caption="Entry Setup", use_container_width=True)  # Updated here
+            st.image(entry_screenshot, caption="Entry Setup", use_container_width=True)
         if exit_screenshot:
-            st.image(exit_screenshot, caption="Exit Setup", use_container_width=True)  # Updated here
+            st.image(exit_screenshot, caption="Exit Setup", use_container_width=True)
+    
     with col2:
         # Trade Details
         st.subheader("Trade Details")
@@ -211,7 +209,7 @@ with tabs[0]:
         # Calculate position size for closed trades
         position_size = None
         if entry_price and stop_loss and initial_capital and risk_percent:
-            position_size = calculate_position_size(initial_capital, risk_percent, entry_price, stop_loss)
+             position_size = calculate_position_size(initial_capital, risk_percent, entry_price, stop_loss)
 
         # Show charges calculation for closed trades
         if status == "Closed" and entry_price and exit_price and position_size:
@@ -250,6 +248,7 @@ with tabs[0]:
            
             # Add trade to database with screenshots
             new_trade = {
+                'user_id': user_id,
                 'date': datetime.now(),
                 'symbol': symbol,
                 'trade_type': trade_type,
@@ -264,7 +263,6 @@ with tabs[0]:
                 'gst': charges['gst'],
                 'stamp_duty': charges['stamp_duty'],
                 'total_charges': charges['total_charges'],
-                'pnl': pnl,
                 'net_pnl': net_pnl,
                 'setup_type': setup_type,
                 'market_condition': market_condition,
@@ -275,12 +273,12 @@ with tabs[0]:
                 'exit_screenshot': exit_image
             }
             c.execute("""
-            INSERT INTO trades (date, symbol, trade_type, entry_price, exit_price, stop_loss, target, position_size,
+            INSERT INTO trades (user_id, date, symbol, trade_type, entry_price, exit_price, stop_loss, target, position_size,
                                 brokerage, stt, transaction_charges, gst, stamp_duty, total_charges, net_pnl,
                                 setup_type, market_condition, psychology, notes, entry_screenshot, exit_screenshot, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                new_trade['date'], new_trade['symbol'], new_trade['trade_type'], new_trade['entry_price'],
+                new_trade['user_id'], new_trade['date'], new_trade['symbol'], new_trade['trade_type'], new_trade['entry_price'],
                 new_trade['exit_price'], new_trade['stop_loss'], new_trade['target'], new_trade['position_size'],
                 new_trade['brokerage'], new_trade['stt'], new_trade['transaction_charges'], new_trade['gst'],
                 new_trade['stamp_duty'], new_trade['total_charges'], new_trade['net_pnl'], new_trade['setup_type'],
@@ -292,7 +290,7 @@ with tabs[0]:
 
 with tabs[1]:
     st.header("📖 Trade Journal")
-    trades_df = pd.read_sql("SELECT * FROM trades", conn)
+    trades_df = pd.read_sql("SELECT * FROM trades WHERE user_id = ?", conn, params=(user_id,))
     if not trades_df.empty:
         # Display trades in an expandable format
         for index, trade in trades_df.iterrows():
@@ -309,9 +307,8 @@ with tabs[1]:
                    
                     if trade['entry_screenshot']:
                         st.write("**Entry Screenshot**")
-                        st.image(base64.b64decode(trade['entry_screenshot']), use_container_width=True)  # Updated here
+                        st.image(base64.b64decode(trade['entry_screenshot']), use_container_width=True)
 
-               
                 with trade_col2:
                     st.write("**Trade Analysis**")
                     st.write(f"Setup: {trade['setup_type']}")
@@ -321,7 +318,15 @@ with tabs[1]:
                    
                     if trade['exit_screenshot'] and trade['status'] == 'Closed':
                         st.write("**Exit Screenshot**")
-                        st.image(base64.b64decode(trade['exit_screenshot']), use_container_width=True)  # Updated here
+                        st.image(base64.b64decode(trade['exit_screenshot']), use_container_width=True)
+
+                # Edit and Delete options
+                if st.button("Edit", key=f"edit_{trade['id']}"):
+                    edit_trade(trade)
+
+                if st.button("Delete", key=f"delete_{trade['id']}"):
+                    delete_trade(trade['id'])
+
         # Download CSV button
         csv = trades_df.to_csv(index=False)
         st.download_button(
@@ -408,9 +413,48 @@ with tabs[2]:
     else:
         st.info("Start logging trades to see analytics!")
 
+# Function to edit a trade
+def edit_trade(trade):
+    st.session_state.editing_trade = trade['id']
+    st.session_state.editing_data = trade
+
+    # Populate the form with existing trade data
+    st.text_input("Stock Symbol", value=trade['symbol'], key="edit_symbol")
+    st.number_input("Entry Price (₹)", value=trade['entry_price'], key="edit_entry_price")
+    st.number_input("Exit Price (₹)", value=trade['exit_price'], key="edit_exit_price")
+    st.number_input("Stop Loss (₹)", value=trade['stop_loss'], key="edit_stop_loss")
+    st.number_input("Target Price (₹)", value=trade['target'], key="edit_target_price")
+    st.selectbox("Trade Status", ["Open", "Closed"], index=1 if trade['status'] == "Closed" else 0, key="edit_status")
+
+    if st.button("Update Trade"):
+        # Update the trade in the database
+        c.execute("""
+        UPDATE trades SET symbol=?, entry_price=?, exit_price=?, stop_loss=?, target=?, status=?
+        WHERE id=?
+        """, (
+            st.session_state.editing_data['symbol'],
+            st.session_state.editing_data['entry_price'],
+            st.session_state.editing_data['exit_price'],
+            st.session_state.editing_data['stop_loss'],
+            st.session_state.editing_data['target'],
+            st.session_state.editing_data['status'],
+            st.session_state.editing_trade
+        ))
+        conn.commit()
+        st.success("Trade updated successfully!")
+        st.session_state.editing_trade = None
+
+# Function to delete a trade
+def delete_trade(trade_id):
+    if st.confirm("Are you sure you want to delete this trade?"):
+        c.execute("DELETE FROM trades WHERE id=?", (trade_id,))
+        conn.commit()
+        st.success("Trade deleted successfully!")
+
 # Footer
 st.markdown("---")
 st.markdown("Built with ❤️ for traders who take journaling seriously")
 
 # Close the database connection
-conn.close()
+conn.close()                     
+    
