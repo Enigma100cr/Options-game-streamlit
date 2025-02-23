@@ -275,34 +275,9 @@ with tabs[0]:
                 'exit_screenshot': exit_image
             }
             c.execute("""
-                            CREATE TABLE IF NOT EXISTS trades (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            user_id TEXT,
-                            date TEXT,
-                            symbol TEXT,
-                            trade_type TEXT,
-                            entry_price REAL,
-                            exit_price REAL,
-                            stop_loss REAL,
-                            target REAL,
-                            position_size INTEGER,
-                            brokerage REAL,
-                            stt REAL,
-                            transaction_charges REAL,
-                            gst REAL,
-                            stamp_duty REAL,
-                            total_charges REAL,
-                            net_pnl REAL,
-                            setup_type TEXT,
-                            market_condition TEXT,
-                            psychology TEXT,
-                            notes TEXT,
-                            entry_screenshot BLOB,
-                            exit_screenshot BLOB,
-                            status TEXT
-                        )
-                        """)
-
+            INSERT INTO trades (user_id, date, symbol, trade_type, entry_price, exit_price, stop_loss, target, position_size,
+                                brokerage, stt, transaction_charges, gst, stamp_duty, total_charges, net_pnl,
+                                setup_type, market_condition, psychology, notes, entry_screenshot, exit_screenshot, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 new_trade['user_id'], new_trade['date'], new_trade['symbol'], new_trade['trade_type'], new_trade['entry_price'],
