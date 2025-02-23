@@ -251,7 +251,7 @@ with tabs[0]:
             # Add trade to database with screenshots
             new_trade = {
                 'user_id': user_id,
-                'date': datetime.now(),
+                'date': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 'symbol': symbol,
                 'trade_type': trade_type,
                 'entry_price': entry_price,
