@@ -11,7 +11,9 @@ from openpyxl.drawing.image import Image as ExcelImage
 
 # Database configuration
 DATABASE_URI = 'sqlite:///trading_data.db'  # SQLite database file
-conn = sqlite3.connect(DATABASE_URI)
+#conn = sqlite3.connect(DATABASE_URI)
+conn = sqlite3.connect("trading_data.db", check_same_thread=False)
+
 c = conn.cursor()
 
 # Create a table for storing trade data if it doesn't exist
