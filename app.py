@@ -19,6 +19,7 @@ c = conn.cursor()
 # Create a table for storing trade data if it doesn't exist
 c.execute("""
 CREATE TABLE IF NOT EXISTS trades (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id TEXT,
     date TEXT,
     symbol TEXT,
@@ -275,7 +276,7 @@ with tabs[0]:
                 'exit_screenshot': exit_image
             }
             c.execute("""
-            INSERT INTO trades (user_id, date, symbol, trade_type, entry_price, exit_price, stop_loss, target, position_size,
+            INSERT INTO trades (id, user_id, date, symbol, trade_type, entry_price, exit_price, stop_loss, target, position_size,
                                 brokerage, stt, transaction_charges, gst, stamp_duty, total_charges, net_pnl,
                                 setup_type, market_condition, psychology, notes, entry_screenshot, exit_screenshot, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
