@@ -166,6 +166,7 @@ with tabs[0]:
     with col1:
         # Market Analysis
         st.subheader("Market Analysis")
+        date = st.date_input("Trade Date")
         market_condition = st.selectbox(
             "Market Condition",
             ["Bullish", "Bearish", "Sideways", "Volatile"]
