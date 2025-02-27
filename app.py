@@ -277,7 +277,7 @@ with tabs[0]:
             }
             c.execute("""
             INSERT INTO trades (user_id, date, symbol, trade_type, entry_price, exit_price, stop_loss, target, position_size,
-                                brokerage, stt, transaction_charges, gst, stamp_duty, total_charges,
+                                brokerage, stt, transaction_charges, gst, stamp_duty, total_charges, net_pnl,
                                 setup_type, market_condition, psychology, notes, entry_screenshot, exit_screenshot, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
