@@ -45,17 +45,15 @@ def edit_trade(trade):
 
 
 # Function to delete a trade
+# Function to delete a trade
 def delete_trade(trade_id):
-    # Show a warning message
+    # Create a confirmation button
     if st.button("Delete Trade"):
-        st.warning("Are you sure you want to delete this trade?")
-        if st.button("Yes, delete"):
+        # If the button is clicked, show a confirmation message
+        if st.confirm("Are you sure you want to delete this trade?"):
             c.execute("DELETE FROM trades WHERE id=?", (trade_id,))
             conn.commit()
             st.success("Trade deleted successfully!")
-        if st.button("No, cancel"):
-            st.info("Trade deletion canceled.")
-
 
 
 # Database configuration
