@@ -50,7 +50,7 @@ def delete_trade(trade_id):
     # Create a confirmation button
     if st.button("Delete Trade"):
         # If the button is clicked, show a confirmation message
-        if st.confirm("Are you sure you want to delete this trade?"):
+        if st.button("If sure to delete this trade, press this button"):
             c.execute("DELETE FROM trades WHERE id=?", (trade_id,))
             conn.commit()
             st.success("Trade deleted successfully!")
