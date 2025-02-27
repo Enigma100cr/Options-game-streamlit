@@ -246,20 +246,13 @@ with tabs[0]:
             net_pnl = pnl - charges['total_charges'] if status == "Closed" else 0
            
             # Convert screenshots to base64
-            #entry_image = get_image_base64(entry_screenshot) if entry_screenshot else None
-            #exit_image = get_image_base64(exit_screenshot) if exit_screenshot else None
-            def convert_image_to_blob(image_file):
-                if image_file is not None:
-                    return image_file.read()
-                return None
-            entry_screenshot_blob = convert_image_to_blob(entry_screenshot)
-            exit_screenshot_blob = convert_image_to_blob(exit_screenshot)
-
+            entry_image = get_image_base64(entry_screenshot) if entry_screenshot else None
+            exit_image = get_image_base64(exit_screenshot) if exit_screenshot else None
            
             # Add trade to database with screenshots
             new_trade = {
                 'user_id': user_id,
-                'date': datetime.now(),
+                'date': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 'symbol': symbol,
                 'trade_type': trade_type,
                 'entry_price': entry_price,
@@ -279,17 +272,16 @@ with tabs[0]:
                 'psychology': emotion,
                 'notes': setup_notes,
                 'status': status,
-                'entry_screenshot': entry_screenshot_blob,
-                'exit_screenshot': exit_screenshot_blob
+                'entry_screenshot': entry_image,
+                'exit_screenshot': exit_image
             }
-            
             c.execute("""
-            INSERT INTO trades (id, user_id, date, symbol, trade_type, entry_price, exit_price, stop_loss, target, position_size,
+            INSERT INTO trades (user_id, date, symbol, trade_type, entry_price, exit_price, stop_loss, target, position_size,
                                 brokerage, stt, transaction_charges, gst, stamp_duty, total_charges, net_pnl,
                                 setup_type, market_condition, psychology, notes, entry_screenshot, exit_screenshot, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                1, new_trade['user_id'], new_trade['date'], new_trade['symbol'], new_trade['trade_type'], new_trade['entry_price'],
+                new_trade['user_id'], new_trade['date'], new_trade['symbol'], new_trade['trade_type'], new_trade['entry_price'],
                 new_trade['exit_price'], new_trade['stop_loss'], new_trade['target'], new_trade['position_size'],
                 new_trade['brokerage'], new_trade['stt'], new_trade['transaction_charges'], new_trade['gst'],
                 new_trade['stamp_duty'], new_trade['total_charges'], new_trade['net_pnl'], new_trade['setup_type'],
@@ -297,7 +289,7 @@ with tabs[0]:
                 new_trade['exit_screenshot'], new_trade['status']
             ))
             conn.commit()
-            st.success("Trade logged successfully with screenshots!")
+            st.success("Trade logged successfully with screenshots!")    
 
 with tabs[1]:
     st.header("📖 Trade Journal")
