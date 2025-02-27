@@ -226,7 +226,7 @@ with tabs[0]:
                 st.metric("Brokerage", f"₹{charges['brokerage']:,.2f}")
                 st.metric("STT", f"₹{charges['stt']:,.2f}")
                 st.metric("Transaction Charges", f"₹{charges['transaction_charges']:,.2f}")
-                st.metric("Net_P&L", f"₹{net_pnl:,.2f}")
+                st.metric("Net P&L", f"₹{net_pnl:,.2f}")
                 
             with charges_col2:
                 st.metric("GST", f"₹{charges['gst']:,.2f}")
