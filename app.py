@@ -9,6 +9,46 @@ from PIL import Image
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image as ExcelImage
 
+# Function to edit a trade
+def edit_trade(trade):
+    st.session_state.editing_trade = trade['id']
+    st.session_state.editing_data = trade
+
+    # Populate the form with existing trade data
+    st.text_input("Stock Symbol", value=trade['symbol'], key="edit_symbol")
+    st.number_input("Entry Price (₹)", value=trade['entry_price'], key="edit_entry_price")
+    st.number_input("Exit Price (₹)", value=trade['exit_price'], key="edit_exit_price")
+    st.number_input("Stop Loss (₹)", value=trade['stop_loss'], key="edit_stop_loss")
+    st.number_input("Target Price (₹)", value=trade['target'], key="edit_target_price")
+    st.selectbox("Trade Status", ["Open", "Closed"], index=1 if trade['status'] == "Closed" else 0, key="edit_status")
+
+    if st.button("Update Trade"):
+        # Update the trade in the database
+        c.execute("""
+        UPDATE trades SET symbol=?, entry_price=?, exit_price=?, stop_loss=?, target=?, status=?
+        WHERE id=?
+        """, (
+            st.session_state.editing_data['symbol'],
+            st.session_state.editing_data['entry_price'],
+            st.session_state.editing_data['exit_price'],
+            st.session_state.editing_data['stop_loss'],
+            st.session_state.editing_data['target'],
+            st.session_state.editing_data['status'],
+            st.session_state.editing_trade
+        ))
+        conn.commit()
+        st.success("Trade updated successfully!")
+        st.session_state.editing_trade = None
+
+# Function to delete a trade
+def delete_trade(trade_id):
+    if st.confirm("Are you sure you want to delete this trade?"):
+        c.execute("DELETE FROM trades WHERE id=?", (trade_id,))
+        conn.commit()
+        st.success("Trade deleted successfully!")
+
+
+
 # Database configuration
 DATABASE_URI = 'sqlite:///trading_data.db'  # SQLite database file
 #conn = sqlite3.connect(DATABASE_URI)
