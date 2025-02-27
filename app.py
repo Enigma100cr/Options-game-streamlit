@@ -246,8 +246,15 @@ with tabs[0]:
             net_pnl = pnl - charges['total_charges'] if status == "Closed" else 0
            
             # Convert screenshots to base64
-            entry_image = get_image_base64(entry_screenshot) if entry_screenshot else None
-            exit_image = get_image_base64(exit_screenshot) if exit_screenshot else None
+            #entry_image = get_image_base64(entry_screenshot) if entry_screenshot else None
+            #exit_image = get_image_base64(exit_screenshot) if exit_screenshot else None
+            def convert_image_to_blob(image_file):
+                if image_file is not None:
+                    return image_file.read()
+                return None
+            entry_screenshot_blob = convert_image_to_blob(entry_screenshot)
+            exit_screenshot_blob = convert_image_to_blob(exit_screenshot)
+
            
             # Add trade to database with screenshots
             new_trade = {
@@ -272,8 +279,8 @@ with tabs[0]:
                 'psychology': emotion,
                 'notes': setup_notes,
                 'status': status,
-                'entry_screenshot': entry_image,
-                'exit_screenshot': exit_image
+                'entry_screenshot': entry_screenshot_blob,
+                'exit_screenshot': exit_screenshot_blob
             }
             c.execute("""
             INSERT INTO trades (id, user_id, date, symbol, trade_type, entry_price, exit_price, stop_loss, target, position_size,
