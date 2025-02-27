@@ -282,6 +282,7 @@ with tabs[0]:
                 'entry_screenshot': entry_screenshot_blob,
                 'exit_screenshot': exit_screenshot_blob
             }
+            print(new_trade)
             c.execute("""
             INSERT INTO trades (id, user_id, date, symbol, trade_type, entry_price, exit_price, stop_loss, target, position_size,
                                 brokerage, stt, transaction_charges, gst, stamp_duty, total_charges, net_pnl,
