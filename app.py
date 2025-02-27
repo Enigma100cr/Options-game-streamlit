@@ -276,12 +276,12 @@ with tabs[0]:
                 'exit_screenshot': exit_image
             }
             c.execute("""
-            INSERT INTO trades (user_id, date, symbol, trade_type, entry_price, exit_price, stop_loss, target, position_size,
+            INSERT INTO trades (id, user_id, date, symbol, trade_type, entry_price, exit_price, stop_loss, target, position_size,
                                 brokerage, stt, transaction_charges, gst, stamp_duty, total_charges, net_pnl,
                                 setup_type, market_condition, psychology, notes, entry_screenshot, exit_screenshot, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                new_trade['user_id'], new_trade['date'], new_trade['symbol'], new_trade['trade_type'], new_trade['entry_price'],
+                1, new_trade['user_id'], new_trade['date'], new_trade['symbol'], new_trade['trade_type'], new_trade['entry_price'],
                 new_trade['exit_price'], new_trade['stop_loss'], new_trade['target'], new_trade['position_size'],
                 new_trade['brokerage'], new_trade['stt'], new_trade['transaction_charges'], new_trade['gst'],
                 new_trade['stamp_duty'], new_trade['total_charges'], new_trade['net_pnl'], new_trade['setup_type'],
