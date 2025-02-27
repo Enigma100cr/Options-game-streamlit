@@ -218,12 +218,16 @@ with tabs[0]:
         if status == "Closed" and entry_price and exit_price and position_size:
             st.subheader("Charges Breakdown")
             charges = calculate_charges(position_size, entry_price, exit_price, trade_type)
+            pnl = calculate_pnl(position_size, entry_price, exit_price) if status == "Closed" else 0
+            net_pnl = pnl - charges['total_charges'] if status == "Closed" else 0
            
             charges_col1, charges_col2 = st.columns(2)
             with charges_col1:
                 st.metric("Brokerage", f"₹{charges['brokerage']:,.2f}")
                 st.metric("STT", f"₹{charges['stt']:,.2f}")
                 st.metric("Transaction Charges", f"₹{charges['transaction_charges']:,.2f}")
+                st.metric("Net_P&L", f"₹{net_pnl:,.2f}")
+                
             with charges_col2:
                 st.metric("GST", f"₹{charges['gst']:,.2f}")
                 st.metric("Stamp Duty", f"₹{charges['stamp_duty']:,.2f}")
