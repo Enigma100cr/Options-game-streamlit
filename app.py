@@ -19,7 +19,8 @@ c = conn.cursor()
 # Create a table for storing trade data if it doesn't exist
 c.execute("""
 CREATE TABLE IF NOT EXISTS trades (
-    user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT,
     date TEXT,
     symbol TEXT,
     trade_type TEXT,
