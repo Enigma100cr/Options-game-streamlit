@@ -10,11 +10,11 @@ from openpyxl import Workbook
 from openpyxl.drawing.image import Image as ExcelImage
 
 # Database configuration
-DATABASE_URI = 'sqlite:///trading_data.db'  # SQLite database file
+DATABASE_URI = 'sqlite:///trading_data.db'
 conn = sqlite3.connect("trading_data.db", check_same_thread=False)
 c = conn.cursor()
 
-# Create a table for storing trade data if it doesn't exist
+# Create trades table
 c.execute("""
 CREATE TABLE IF NOT EXISTS trades (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -38,334 +38,226 @@ CREATE TABLE IF NOT EXISTS trades (
 """)
 conn.commit()
 
-# Set page config
+# Page config
 st.set_page_config(page_title="Options Trading Journal", layout="wide")
 
-def calculate_position_size(capital, risk_percent, entry, stop_loss):
+def calculate_position_size(capital, risk_percent, entry, stop_loss, position_type):
     risk_amount = capital * (risk_percent / 100)
-    position_size = risk_amount / abs(entry - stop_loss)
+    if position_type == "Long":
+        risk_per_share = entry - stop_loss
+    else:
+        risk_per_share = stop_loss - entry
+    position_size = risk_amount / risk_per_share if risk_per_share != 0 else 0
     return round(position_size)
 
 def get_image_base64(image_file):
     if image_file is not None:
-        bytes_data = image_file.getvalue()
-        return base64.b64encode(bytes_data).decode()
+        return base64.b64encode(image_file.read()).decode()
     return None
 
 def save_to_excel(trades_df):
     wb = Workbook()
     ws = wb.active
     ws.title = "Trade Journal"
-
-    headers = [
-        "Date", "Symbol", "Trade Type", "Entry Price", "Exit Price", "Stop Loss",
-        "Target", "Position Size", "Status", "Setup Type", "Market Condition",
-        "Psychology", "Notes", "Entry Screenshot", "Exit Screenshot"
-    ]
+    headers = ["Date", "Symbol", "Type", "Entry", "Exit", "Status", "Position Size", "Notes"]
     ws.append(headers)
-
-    for index, trade in trades_df.iterrows():
-        row = [
-            trade['date'], trade['symbol'], trade['trade_type'], trade['entry_price'],
-            trade['exit_price'], trade['stop_loss'], trade['target'], trade['position_size'],
-            trade['status'], trade['setup_type'], trade['market_condition'], trade['psychology'],
-            trade['notes']
-        ]
-        ws.append(row)
-
-        if trade['entry_screenshot']:
-            entry_image = Image.open(io.BytesIO(base64.b64decode(trade['entry_screenshot'])))
-            entry_image_path = f"entry_screenshot_{trade['id']}.png"
-            entry_image.save(entry_image_path)
-            img = ExcelImage(entry_image_path)
-            ws.add_image(img, f'T{ws.max_row}')
-
-        if trade['exit_screenshot']:
-            exit_image = Image.open(io.BytesIO(base64.b64decode(trade['exit_screenshot'])))
-            exit_image_path = f"exit_screenshot_{trade['id']}.png"
-            exit_image.save(exit_image_path)
-            img = ExcelImage(exit_image_path)
-            ws.add_image(img, f'U{ws.max_row}')
-
+    for index, row in trades_df.iterrows():
+        ws.append([
+            row['date'], row['symbol'], row['trade_type'],
+            row['entry_price'], row['exit_price'], row['status'],
+            row['position_size'], row['notes']
+        ])
     excel_file = "trade_journal.xlsx"
     wb.save(excel_file)
     return excel_file
 
-# Header
-st.title("🚀 Advanced Options Trading Journal")
-st.markdown("Track your trades, analyze performance, and improve your psychology")
+# Main app
+st.title("📈 Professional Trading Journal & Calculator")
+st.markdown("---")
 
-# Sidebar for analytics
-with st.sidebar:
-    st.header("📊 Trading Statistics")
-    user_id = st.text_input("Enter User ID for Personalized Access", placeholder="User ID")
-    trades_df = pd.read_sql("SELECT * FROM trades WHERE user_id = ?", conn, params=(user_id,))
-    
-    if not trades_df.empty:
-        completed_trades = trades_df[trades_df['status'] == 'Closed']
-        if not completed_trades.empty:
-            total_trades = len(completed_trades)
-            winning_trades = len(completed_trades[completed_trades['net_pnl'] > 0])
-            win_rate = (winning_trades / total_trades) * 100 if total_trades > 0 else 0
-            total_profit = completed_trades['net_pnl'].sum()
-           
-            st.metric("Total Trades", total_trades)
-            st.metric("Win Rate", f"{win_rate:.2f}%")
-            st.metric("Total P&L", f"₹{total_profit:,.2f}")
-           
-            # Show equity curve
-            cumulative_pnl = completed_trades['net_pnl'].cumsum()
-            fig = px.line(cumulative_pnl, title='Equity Curve')
-            st.plotly_chart(fig)
+# Tabs
+tabs = st.tabs(["📝 Trade Journal", "🧮 Position Calculator", "📊 Analytics", "⚙️ Settings"])
 
-# Main content
-tabs = st.tabs(["Trade Entry", "Trade Journal", "Analytics"])
-
-with tabs[0]:
-    st.header("📝 Trade Entry Form")
-   
-    col1, col2 = st.columns(2)
-   
+with tabs[0]:  # Trade Journal
+    col1, col2 = st.columns([1, 2])
     with col1:
-        # Market Analysis
-        st.subheader("Market Analysis")
-        date = st.date_input("Trade Date")
-        market_condition = st.selectbox(
-            "Market Condition",
-            ["Bullish", "Bearish", "Sideways", "Volatile"]
-        )
-        setup_type = st.selectbox(
-            "Setup Type",
-            ["Breakout", "Reversal", "Trend Following", "Support/Resistance", "Pattern"]
-        )
-       
-        # Position Sizing
-        st.subheader("Position Sizing")
-        initial_capital = st.number_input("Initial Capital (₹)", value=100000.0, step=1000.0)
-        risk_percent = st.number_input("Risk Per Trade (%)", value=1.0, max_value=5.0, step=0.1)
-       
-        # Add screenshot upload section
-        st.subheader("📸 Trade Screenshots")
-        entry_screenshot = st.file_uploader("Entry Screenshot", type=['png', 'jpg', 'jpeg'])
-        exit_screenshot = st.file_uploader("Exit Screenshot", type=['png', 'jpg', 'jpeg'])
-
-        if entry_screenshot:
-            st.image(entry_screenshot, caption="Entry Setup", use_container_width=True)
-        if exit_screenshot:
-            st.image(exit_screenshot, caption="Exit Setup", use_container_width=True)
+        st.subheader("🔍 Filter Trades")
+        start_date = st.date_input("Start Date", datetime.today())
+        end_date = st.date_input("End Date", datetime.today())
+        selected_symbol = st.text_input("Filter by Symbol")
     
     with col2:
-        # Trade Details
-        st.subheader("Trade Details")
-        symbol = st.text_input("Stock Symbol", placeholder="e.g., RELIANCE")
-        trade_type = st.selectbox("Trade Type", ["Call Option", "Put Option", "Swing Trade"])
-        entry_price = st.number_input("Entry Price (₹)", value=0.0, step=0.1)
-        exit_price = st.number_input("Exit Price (₹)", value=0.0, step=0.1)
-        target_price = st.number_input("Target Price (₹)", value=0.0, step=0.1)
-        stop_loss = st.number_input("Stop Loss (₹)", value=0.0, step=0.1)
-        status = st.selectbox("Trade Status", ["Open", "Closed"])
-       
-        # Psychology Check
-        st.subheader("Psychology Check")
-        emotion = st.selectbox(
-            "Current Emotional State",
-            ["Confident & Calm", "Fearful", "Excited", "FOMO", "Revenge Trading Urge"]
-        )
-       
-        # Calculate position size for closed trades
-        position_size = None
-        if entry_price and stop_loss and initial_capital and risk_percent:
-             position_size = calculate_position_size(initial_capital, risk_percent, entry_price, stop_loss)
-
-    # Trade Notes
-    st.subheader("Trade Notes")
-    setup_notes = st.text_area("Setup Analysis", height=100)
-
-    # Submit button
-    if st.button("Log Trade"):
-        if emotion in ["FOMO", "Revenge Trading Urge"]:
-            st.error("⚠️ Trading not recommended in current psychological state!")
+        st.subheader("📜 Trade History")
+        query = """
+            SELECT * FROM trades 
+            WHERE date BETWEEN ? AND ?
+            AND symbol LIKE ?
+        """
+        trades_df = pd.read_sql(query, conn, params=(
+            start_date.strftime("%Y-%m-%d"),
+            end_date.strftime("%Y-%m-%d"),
+            f"%{selected_symbol}%"
+        ))
+        
+        if not trades_df.empty:
+            for _, trade in trades_df.iterrows():
+                with st.expander(f"{trade['symbol']} - {trade['date']} - {trade['status']}"):
+                    cols = st.columns([3,1])
+                    with cols[0]:
+                        st.write(f"**Entry:** ₹{trade['entry_price']} | **Exit:** ₹{trade['exit_price']}")
+                        st.write(f"**Size:** {trade['position_size']} | **Risk:** {trade['stop_loss']}")
+                        st.write(f"**Notes:** {trade['notes']}")
+                    with cols[1]:
+                        if st.button("✏️ Edit", key=f"edit_{trade['id']}"):
+                            st.session_state.edit_trade = trade
+                        if st.button("🗑️ Delete", key=f"delete_{trade['id']}"):
+                            c.execute("DELETE FROM trades WHERE id=?", (trade['id'],))
+                            conn.commit()
+                            st.rerun()
         else:
-            # Convert screenshots to base64
-            entry_image = get_image_base64(entry_screenshot) if entry_screenshot else None
-            exit_image = get_image_base64(exit_screenshot) if exit_screenshot else None
-           
-            # Add trade to database with screenshots
-            new_trade = {
-                'user_id': user_id,
-                'date': date.strftime("%Y-%m-%d %H:%M:%S"),
-                'symbol': symbol,
-                'trade_type': trade_type,
-                'entry_price': entry_price,
-                'exit_price': exit_price if status == "Closed" else None,
-                'stop_loss': stop_loss,
-                'target': target_price,
-                'position_size': position_size,
-                'status': status,
-                'setup_type': setup_type,
-                'market_condition': market_condition,
-                'psychology': emotion,
-                'notes': setup_notes,
-                'entry_screenshot': entry_image,
-                'exit_screenshot': exit_image
-            }
+            st.info("No trades found for selected filters")
+
+with tabs[1]:  # Position Calculator
+    st.subheader("📐 Position Size Calculator")
+    
+    calc_col1, calc_col2 = st.columns(2)
+    with calc_col1:
+        st.markdown("### Long Position")
+        long_entry = st.number_input("Entry Price", value=100.0, key="long_entry")
+        long_stop = st.number_input("Stop Loss", value=80.0, key="long_stop")
+        long_target = st.number_input("Target Price", value=150.0, key="long_target")
+        long_risk = st.number_input("Risk (%)", value=2.0, key="long_risk")
+        long_capital = st.number_input("Capital", value=100000.0, key="long_capital")
+        
+        if st.button("Calculate Long"):
+            position_size = calculate_position_size(long_capital, long_risk, long_entry, long_stop, "Long")
+            risk_amount = long_capital * (long_risk / 100)
+            reward_risk = (long_target - long_entry) / (long_entry - long_stop)
+            
+            st.markdown("### Results")
+            st.write(f"**Position Size:** {position_size}")
+            st.write(f"**Risk Amount:** ₹{risk_amount:,.2f}")
+            st.write(f"**Reward/Risk Ratio:** {reward_risk:.2f}:1")
+    
+    with calc_col2:
+        st.markdown("### Short Position")
+        short_entry = st.number_input("Entry Price", value=200.0, key="short_entry")
+        short_stop = st.number_input("Stop Loss", value=220.0, key="short_stop")
+        short_target = st.number_input("Target Price", value=140.0, key="short_target")
+        short_risk = st.number_input("Risk (%)", value=2.0, key="short_risk")
+        short_capital = st.number_input("Capital", value=50000.0, key="short_capital")
+        
+        if st.button("Calculate Short"):
+            position_size = calculate_position_size(short_capital, short_risk, short_entry, short_stop, "Short")
+            risk_amount = short_capital * (short_risk / 100)
+            reward_risk = (short_entry - short_target) / (short_stop - short_entry)
+            
+            st.markdown("### Results")
+            st.write(f"**Position Size:** {position_size}")
+            st.write(f"**Risk Amount:** ₹{risk_amount:,.2f}")
+            st.write(f"**Reward/Risk Ratio:** {reward_risk:.2f}:1")
+
+with tabs[2]:  # Analytics
+    st.subheader("📈 Performance Analytics")
+    if not trades_df.empty:
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            total_trades = len(trades_df)
+            st.metric("Total Trades", total_trades)
+        with col2:
+            win_rate = (len(trades_df[trades_df['exit_price'] > trades_df['entry_price']) / total_trades) * 100
+            st.metric("Win Rate", f"{win_rate:.1f}%")
+        with col3:
+            total_pnl = (trades_df['exit_price'] - trades_df['entry_price']).sum()
+            st.metric("Total P&L", f"₹{total_pnl:,.2f}")
+        
+        st.plotly_chart(px.line(trades_df, x='date', y='exit_price', title='Equity Curve'))
+    else:
+        st.info("No data available for analytics")
+
+with tabs[3]:  # Settings/New Trade
+    st.subheader("➕ New Trade Entry")
+    
+    with st.form("new_trade_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            trade_date = st.date_input("Trade Date")
+            symbol = st.text_input("Symbol")
+            trade_type = st.selectbox("Type", ["Long", "Short"])
+            entry_price = st.number_input("Entry Price")
+            exit_price = st.number_input("Exit Price")
+        
+        with col2:
+            stop_loss = st.number_input("Stop Loss")
+            target_price = st.number_input("Target Price")
+            position_size = st.number_input("Position Size")
+            status = st.selectbox("Status", ["Open", "Closed"])
+            notes = st.text_area("Notes")
+        
+        if st.form_submit_button("Save Trade"):
             c.execute("""
-            INSERT INTO trades (user_id, date, symbol, trade_type, entry_price, exit_price, stop_loss, target, position_size,
-                                status, setup_type, market_condition, psychology, notes, entry_screenshot, exit_screenshot)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO trades (
+                    date, symbol, trade_type, entry_price, exit_price,
+                    stop_loss, target, position_size, status, notes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                new_trade['user_id'], new_trade['date'], new_trade['symbol'], new_trade['trade_type'], new_trade['entry_price'],
-                new_trade['exit_price'], new_trade['stop_loss'], new_trade['target'], new_trade['position_size'],
-                new_trade['status'], new_trade['setup_type'], new_trade['market_condition'], new_trade['psychology'],
-                new_trade['notes'], new_trade['entry_screenshot'], new_trade['exit_screenshot']
+                trade_date.strftime("%Y-%m-%d"),
+                symbol,
+                trade_type,
+                entry_price,
+                exit_price,
+                stop_loss,
+                target_price,
+                position_size,
+                status,
+                notes
             ))
             conn.commit()
-            st.success("Trade logged successfully with screenshots!")    
+            st.success("Trade saved successfully!")
 
-with tabs[1]:
-    st.header("📖 Trade Journal")
-    trades_df = pd.read_sql("SELECT * FROM trades WHERE user_id = ?", conn, params=(user_id,))
-    if not trades_df.empty:
-        # Display trades in an expandable format
-        for index, trade in trades_df.iterrows():
-            with st.expander(f"{trade['symbol']} - {trade['date']}"):
-                trade_col1, trade_col2 = st.columns(2)
-               
-                with trade_col1:
-                    st.write("**Trade Details**")
-                    st.write(f"Symbol: {trade['symbol']}")
-                    st.write(f"Type: {trade['trade_type']}")
-                    st.write(f"Entry: ₹{trade['entry_price']:,.2f}")
-                    st.write(f"Exit: ₹{trade['exit_price']:,.2f}" if trade['exit_price'] else "Exit: Not closed")
-                    st.write(f"Position Size: {trade['position_size']}")
-                   
-                    if trade['entry_screenshot']:
-                        st.write("**Entry Screenshot**")
-                        st.image(base64.b64decode(trade['entry_screenshot']), use_container_width=True)
-
-                with trade_col2:
-                    st.write("**Trade Analysis**")
-                    st.write(f"Setup: {trade['setup_type']}")
-                    st.write(f"Market: {trade['market_condition']}")
-                    st.write(f"Psychology: {trade['psychology']}")
-                    st.write(f"Notes: {trade['notes']}")
-                   
-                    if trade['exit_screenshot'] and trade['status'] == 'Closed':
-                        st.write("**Exit Screenshot**")
-                        st.image(base64.b64decode(trade['exit_screenshot']), use_container_width=True)
-
-                # Edit and Delete options
-                if st.button("Edit", key=f"edit_{trade['id']}"):
-                    edit_trade(trade)
-
-                if st.button("Delete", key=f"delete_{trade['id']}"):
-                    delete_trade(trade['id'])
-
-        # Download CSV button
-        csv = trades_df.to_csv(index=False)
-        st.download_button(
-            label="Download Trade Journal as CSV",
-            data=csv,
-            file_name='trade_journal.csv',
-            mime='text/csv',
-        )
-
-        # Download Excel button
-        if st.button("Download Trade Journal as Excel"):
-            excel_file = save_to_excel(trades_df)
-            with open(excel_file, "rb") as f:
-                st.download_button(
-                    label="Download Excel File",
-                    data=f,
-                    file_name=excel_file,
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-
-with tabs[2]:
-    st.header("📊 Analytics Dashboard")
-    if not trades_df.empty:
-        completed_trades = trades_df[trades_df['status'] == 'Closed']
-        if not completed_trades.empty:
-            col1, col2, col3 = st.columns(3)
-           
-            with col1:
-                best_trade = completed_trades['net_pnl'].max()
-                st.metric("Best Trade (Net)", f"₹{best_trade:,.2f}")
-            with col2:
-                worst_trade = completed_trades['net_pnl'].min()
-                st.metric("Worst Trade (Net)", f"₹{worst_trade:,.2f}")
-            with col3:
-                avg_trade = completed_trades['net_pnl'].mean()
-                st.metric("Average Trade (Net)", f"₹{avg_trade:,.2f}")
-           
-            # Setup Performance
-            st.subheader("Setup Performance")
-            setup_performance = completed_trades.groupby('setup_type')['net_pnl'].agg(['mean', 'count', 'sum']).round(2)
-            st.dataframe(setup_performance)
-           
-            # Monthly Performance
-            st.subheader("Monthly Performance")
-            completed_trades['month'] = pd.to_datetime(completed_trades['date']).dt.strftime('%Y-%m')
-            monthly_pnl = completed_trades.groupby('month')['net_pnl'].sum()
-            fig_monthly = px.bar(monthly_pnl, title='Monthly P&L')
-            st.plotly_chart(fig_monthly)
-           
-            # Win Rate by Setup
-            st.subheader("Win Rate by Setup")
-            setup_winrate = completed_trades.groupby('setup_type').apply(
-                lambda x: (x['net_pnl'] > 0).mean() * 100
-            ).round(2)
-            fig_winrate = px.bar(setup_winrate, title='Win Rate by Setup (%)')
-            st.plotly_chart(fig_winrate)
-           
-            # Trade Distribution
-            st.subheader("Trade Type Distribution")
-            fig_dist = px.pie(completed_trades, names='trade_type', title='Trade Type Distribution')
-            st.plotly_chart(fig_dist)
-    else:
-        st.info("Start logging trades to see analytics!")
-
-# Function to edit a trade
-def edit_trade(trade):
-    st.session_state.editing_trade = trade['id']
-    st.session_state.editing_data = trade
-
-    # Populate the form with existing trade data
-    st.text_input("Stock Symbol", value=trade['symbol'], key="edit_symbol")
-    st.number_input("Entry Price (₹)", value=trade['entry_price'], key="edit_entry_price")
-    st.number_input("Exit Price (₹)", value=trade['exit_price'], key="edit_exit_price")
-    st.number_input("Stop Loss (₹)", value=trade['stop_loss'], key="edit_stop_loss")
-    st.number_input("Target Price (₹)", value=trade['target'], key="edit_target_price")
-    st.selectbox("Trade Status", ["Open", "Closed"], index=1 if trade['status'] == "Closed" else 0, key="edit_status")
-
-    if st.button("Update Trade"):
-        # Update the trade in the database
-        c.execute("""
-        UPDATE trades SET symbol=?, entry_price=?, exit_price=?, stop_loss=?, target=?, status=?
-        WHERE id=?
-        """, (
-            st.session_state.editing_data['symbol'],
-            st.session_state.editing_data['entry_price'],
-            st.session_state.editing_data['exit_price'],
-            st.session_state.editing_data['stop_loss'],
-            st.session_state.editing_data['target'],
-            st.session_state.editing_data['status'],
-            st.session_state.editing_trade
-        ))
-        conn.commit()
-        st.success("Trade updated successfully!")
-        st.session_state.editing_trade = None
-
-# Function to delete a trade
-def delete_trade(trade_id):
-    if st.confirm("Are you sure you want to delete this trade?"):
-        c.execute("DELETE FROM trades WHERE id=?", (trade_id,))
-        conn.commit()
-        st.success("Trade deleted successfully!")
+# Edit Trade Modal
+if 'edit_trade' in st.session_state:
+    with st.form("edit_trade_form"):
+        st.subheader("Edit Trade")
+        trade = st.session_state.edit_trade
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            new_entry = st.number_input("Entry Price", value=trade['entry_price'])
+            new_exit = st.number_input("Exit Price", value=trade['exit_price'])
+            new_status = st.selectbox("Status", ["Open", "Closed"], index=0 if trade['status'] == "Open" else 1)
+        
+        with col2:
+            new_stop = st.number_input("Stop Loss", value=trade['stop_loss'])
+            new_target = st.number_input("Target", value=trade['target'])
+            new_notes = st.text_area("Notes", value=trade['notes'])
+        
+        if st.form_submit_button("Save Changes"):
+            c.execute("""
+                UPDATE trades SET
+                entry_price = ?,
+                exit_price = ?,
+                stop_loss = ?,
+                target = ?,
+                status = ?,
+                notes = ?
+                WHERE id = ?
+            """, (
+                new_entry,
+                new_exit,
+                new_stop,
+                new_target,
+                new_status,
+                new_notes,
+                trade['id']
+            ))
+            conn.commit()
+            del st.session_state.edit_trade
+            st.rerun()
 
 # Footer
 st.markdown("---")
-st.markdown("Built with ❤️ for traders who take journaling seriously")
+st.markdown("© 2024 Trading Journal Pro | All rights reserved")
 
-# Close the database connection
+# Close connection
 conn.close()
