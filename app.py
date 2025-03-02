@@ -165,7 +165,7 @@ with tabs[2]:  # Analytics
             total_trades = len(trades_df)
             st.metric("Total Trades", total_trades)
         with col2:
-            win_rate = (len(trades_df[trades_df['exit_price'] > trades_df['entry_price']) / total_trades) * 100
+            win_rate = (len(trades_df[trades_df['exit_price'] > trades_df['entry_price']]) / total_trades) * 100
             st.metric("Win Rate", f"{win_rate:.1f}%")
         with col3:
             total_pnl = (trades_df['exit_price'] - trades_df['entry_price']).sum()
