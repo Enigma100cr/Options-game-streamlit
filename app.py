@@ -178,6 +178,13 @@ with tabs[1]:  # Position Calculator
 with tabs[2]:  # Analytics
     st.subheader("📈 Performance Analytics")
     trades_df = pd.read_sql("SELECT * FROM trades", conn)
+    
+    # Debugging: Print columns to verify
+    print(trades_df.columns)
+    
+    # Fallback for missing 'net_pnl'
+    trades_df['net_pnl'] = trades_df.get('net_pnl', 0)
+    
     if not trades_df.empty:
         col1, col2, col3 = st.columns(3)
         with col1:
