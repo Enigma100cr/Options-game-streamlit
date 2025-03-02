@@ -9,58 +9,9 @@ from PIL import Image
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image as ExcelImage
 
-# Function to edit a trade
-def edit_trade(trade):
-    st.session_state.editing_trade = trade['id']
-    st.session_state.editing_data = trade
-
-    # Populate the form with existing trade data
-    st.text_input("Stock Symbol", value=trade['symbol'], key="edit_symbol")
-    st.number_input("Entry Price (₹)", value=trade['entry_price'], key="edit_entry_price")
-    st.number_input("Exit Price (₹)", value=trade['exit_price'], key="edit_exit_price")
-    st.number_input("Stop Loss (₹)", value=trade['stop_loss'], key="edit_stop_loss")
-    st.number_input("Target Price (₹)", value=trade['target'], key="edit_target_price")
-    st.selectbox("Trade Status", ["Open", "Closed"], index=1 if trade['status'] == "Closed" else 0, key="edit_status")
-
-    if st.button("Update Trade"):
-        # Update the trade in the database
-        c.execute("""
-        UPDATE trades SET symbol=?, entry_price=?, exit_price=?, stop_loss=?, target=?, status=?
-        WHERE id=?
-        """, (
-            st.session_state.editing_data['symbol'],
-            st.session_state.editing_data['entry_price'],
-            st.session_state.editing_data['exit_price'],
-            st.session_state.editing_data['stop_loss'],
-            st.session_state.editing_data['target'],
-            st.session_state.editing_data['status'],
-            st.session_state.editing_trade
-        ))
-        conn.commit()
-        st.success("Trade updated successfully!")
-        st.session_state.editing_trade = None
-
-# Function to delete a trade
-
-
-
-# Function to delete a trade
-# Function to delete a trade
-def delete_trade(trade_id):
-    # Create a confirmation button
-    if st.button("Delete Trade"):
-        # If the button is clicked, show a confirmation message
-        if st.button("If sure to delete this trade, press this button"):
-            c.execute("DELETE FROM trades WHERE id=?", (trade_id,))
-            conn.commit()
-            st.success("Trade deleted successfully!")
-
-
 # Database configuration
 DATABASE_URI = 'sqlite:///trading_data.db'  # SQLite database file
-#conn = sqlite3.connect(DATABASE_URI)
 conn = sqlite3.connect("trading_data.db", check_same_thread=False)
-
 c = conn.cursor()
 
 # Create a table for storing trade data if it doesn't exist
@@ -76,20 +27,13 @@ CREATE TABLE IF NOT EXISTS trades (
     stop_loss REAL,
     target REAL,
     position_size INTEGER,
-    brokerage REAL,
-    stt REAL,
-    transaction_charges REAL,
-    gst REAL,
-    stamp_duty REAL,
-    total_charges REAL,
-    net_pnl REAL,
+    status TEXT,
     setup_type TEXT,
     market_condition TEXT,
     psychology TEXT,
     notes TEXT,
     entry_screenshot BLOB,
-    exit_screenshot BLOB,
-    status TEXT
+    exit_screenshot BLOB
 )
 """)
 conn.commit()
@@ -101,32 +45,6 @@ def calculate_position_size(capital, risk_percent, entry, stop_loss):
     risk_amount = capital * (risk_percent / 100)
     position_size = risk_amount / abs(entry - stop_loss)
     return round(position_size)
-
-def calculate_pnl(position_size, entry_price, exit_price):
-    return position_size * (exit_price - entry_price)
-
-def calculate_charges(position_size, entry_price, exit_price, trade_type):
-    turnover = position_size * (entry_price + exit_price)
-    brokerage = min(turnover * 0.0003, 40)
-   
-    if trade_type in ["Call Option", "Put Option"]:
-        stt = (position_size * exit_price) * 0.0005
-    else:
-        stt = turnover * 0.0001
-
-    transaction_charges = turnover * 0.0000325
-    gst = (brokerage + transaction_charges) * 0.18
-    stamp_duty = (position_size * entry_price) * 0.00003
-    total_charges = brokerage + stt + transaction_charges + gst + stamp_duty
-   
-    return {
-        'brokerage': round(brokerage, 2),
-        'stt': round(stt, 2),
-        'transaction_charges': round(transaction_charges, 2),
-        'gst': round(gst, 2),
-        'stamp_duty': round(stamp_duty, 2),
-        'total_charges': round(total_charges, 2)
-    }
 
 def get_image_base64(image_file):
     if image_file is not None:
@@ -141,9 +59,8 @@ def save_to_excel(trades_df):
 
     headers = [
         "Date", "Symbol", "Trade Type", "Entry Price", "Exit Price", "Stop Loss",
-        "Target", "Position Size", "Brokerage", "STT", "Transaction Charges",
-        "GST", "Stamp Duty", "Total Charges", "Net P&L", "Setup Type",
-        "Market Condition", "Psychology", "Notes", "Entry Screenshot", "Exit Screenshot"
+        "Target", "Position Size", "Status", "Setup Type", "Market Condition",
+        "Psychology", "Notes", "Entry Screenshot", "Exit Screenshot"
     ]
     ws.append(headers)
 
@@ -151,9 +68,8 @@ def save_to_excel(trades_df):
         row = [
             trade['date'], trade['symbol'], trade['trade_type'], trade['entry_price'],
             trade['exit_price'], trade['stop_loss'], trade['target'], trade['position_size'],
-            trade['brokerage'], trade['stt'], trade['transaction_charges'], trade['gst'],
-            trade['stamp_duty'], trade['total_charges'], trade['net_pnl'], trade['setup_type'],
-            trade['market_condition'], trade['psychology'], trade['notes']
+            trade['status'], trade['setup_type'], trade['market_condition'], trade['psychology'],
+            trade['notes']
         ]
         ws.append(row)
 
@@ -182,7 +98,7 @@ st.markdown("Track your trades, analyze performance, and improve your psychology
 # Sidebar for analytics
 with st.sidebar:
     st.header("📊 Trading Statistics")
-    user_id = st.text_input("Enter User ID for Personalized Access", placeholder="User  ID")
+    user_id = st.text_input("Enter User ID for Personalized Access", placeholder="User ID")
     trades_df = pd.read_sql("SELECT * FROM trades WHERE user_id = ?", conn, params=(user_id,))
     
     if not trades_df.empty:
@@ -261,25 +177,6 @@ with tabs[0]:
         if entry_price and stop_loss and initial_capital and risk_percent:
              position_size = calculate_position_size(initial_capital, risk_percent, entry_price, stop_loss)
 
-        # Show charges calculation for closed trades
-        if status == "Closed" and entry_price and exit_price and position_size:
-            st.subheader("Charges Breakdown")
-            charges = calculate_charges(position_size, entry_price, exit_price, trade_type)
-            pnl = calculate_pnl(position_size, entry_price, exit_price) if status == "Closed" else 0
-            net_pnl = pnl - charges['total_charges'] if status == "Closed" else 0
-           
-            charges_col1, charges_col2 = st.columns(2)
-            with charges_col1:
-                st.metric("Brokerage", f"₹{charges['brokerage']:,.2f}")
-                st.metric("STT", f"₹{charges['stt']:,.2f}")
-                st.metric("Transaction Charges", f"₹{charges['transaction_charges']:,.2f}")
-                st.metric("Net P&L", f"₹{net_pnl:,.2f}")
-                
-            with charges_col2:
-                st.metric("GST", f"₹{charges['gst']:,.2f}")
-                st.metric("Stamp Duty", f"₹{charges['stamp_duty']:,.2f}")
-                st.metric("Total Charges", f"₹{charges['total_charges']:,.2f}")
-
     # Trade Notes
     st.subheader("Trade Notes")
     setup_notes = st.text_area("Setup Analysis", height=100)
@@ -289,13 +186,6 @@ with tabs[0]:
         if emotion in ["FOMO", "Revenge Trading Urge"]:
             st.error("⚠️ Trading not recommended in current psychological state!")
         else:
-            # Calculate PnL and charges for closed trades
-            pnl = calculate_pnl(position_size, entry_price, exit_price) if status == "Closed" else 0
-            charges = calculate_charges(position_size, entry_price, exit_price, trade_type) if status == "Closed" else {
-                'brokerage': 0, 'stt': 0, 'transaction_charges': 0, 'gst': 0, 'stamp_duty': 0, 'total_charges': 0
-            }
-            net_pnl = pnl - charges['total_charges'] if status == "Closed" else 0
-           
             # Convert screenshots to base64
             entry_image = get_image_base64(entry_screenshot) if entry_screenshot else None
             exit_image = get_image_base64(exit_screenshot) if exit_screenshot else None
@@ -303,7 +193,7 @@ with tabs[0]:
             # Add trade to database with screenshots
             new_trade = {
                 'user_id': user_id,
-                'date': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                'date': date.strftime("%Y-%m-%d %H:%M:%S"),
                 'symbol': symbol,
                 'trade_type': trade_type,
                 'entry_price': entry_price,
@@ -311,33 +201,23 @@ with tabs[0]:
                 'stop_loss': stop_loss,
                 'target': target_price,
                 'position_size': position_size,
-                'brokerage': charges['brokerage'],
-                'stt': charges['stt'],
-                'transaction_charges': charges['transaction_charges'],
-                'gst': charges['gst'],
-                'stamp_duty': charges['stamp_duty'],
-                'total_charges': charges['total_charges'],
-                'net_pnl': net_pnl,
+                'status': status,
                 'setup_type': setup_type,
                 'market_condition': market_condition,
                 'psychology': emotion,
                 'notes': setup_notes,
-                'status': status,
                 'entry_screenshot': entry_image,
                 'exit_screenshot': exit_image
             }
             c.execute("""
             INSERT INTO trades (user_id, date, symbol, trade_type, entry_price, exit_price, stop_loss, target, position_size,
-                                brokerage, stt, transaction_charges, gst, stamp_duty, total_charges, net_pnl,
-                                setup_type, market_condition, psychology, notes, entry_screenshot, exit_screenshot, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                status, setup_type, market_condition, psychology, notes, entry_screenshot, exit_screenshot)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 new_trade['user_id'], new_trade['date'], new_trade['symbol'], new_trade['trade_type'], new_trade['entry_price'],
                 new_trade['exit_price'], new_trade['stop_loss'], new_trade['target'], new_trade['position_size'],
-                new_trade['brokerage'], new_trade['stt'], new_trade['transaction_charges'], new_trade['gst'],
-                new_trade['stamp_duty'], new_trade['total_charges'], new_trade['net_pnl'], new_trade['setup_type'],
-                new_trade['market_condition'], new_trade['psychology'], new_trade['notes'], new_trade['entry_screenshot'],
-                new_trade['exit_screenshot'], new_trade['status']
+                new_trade['status'], new_trade['setup_type'], new_trade['market_condition'], new_trade['psychology'],
+                new_trade['notes'], new_trade['entry_screenshot'], new_trade['exit_screenshot']
             ))
             conn.commit()
             st.success("Trade logged successfully with screenshots!")    
@@ -357,7 +237,7 @@ with tabs[1]:
                     st.write(f"Type: {trade['trade_type']}")
                     st.write(f"Entry: ₹{trade['entry_price']:,.2f}")
                     st.write(f"Exit: ₹{trade['exit_price']:,.2f}" if trade['exit_price'] else "Exit: Not closed")
-                    st.write(f"Net P&L: ₹{trade['net_pnl']:,.2f}" if trade['status'] == 'Closed' else "P&L: Trade open")
+                    st.write(f"Position Size: {trade['position_size']}")
                    
                     if trade['entry_screenshot']:
                         st.write("**Entry Screenshot**")
@@ -417,28 +297,6 @@ with tabs[2]:
             with col3:
                 avg_trade = completed_trades['net_pnl'].mean()
                 st.metric("Average Trade (Net)", f"₹{avg_trade:,.2f}")
-           
-            # Charges Analysis
-            st.subheader("Trading Costs Analysis")
-            total_charges = completed_trades[['brokerage', 'stt', 'transaction_charges', 'gst', 'stamp_duty']].sum()
-            fig_charges = px.pie(
-                values=total_charges.values,
-                names=total_charges.index,
-                title='Trading Costs Breakdown'
-            )
-            st.plotly_chart(fig_charges)
-           
-            # Cost Metrics
-            cost_col1, cost_col2 = st.columns(2)
-            with cost_col1:
-                total_turnover = (completed_trades['position_size'] *
-                                (completed_trades['entry_price'] + completed_trades['exit_price'])).sum()
-                st.metric("Total Turnover", f"₹{total_turnover:,.2f}")
-                st.metric("Total Charges", f"₹{completed_trades['total_charges'].sum():,.2f}")
-            with cost_col2:
-                cost_percentage = (completed_trades['total_charges'].sum() / total_turnover * 100) if total_turnover > 0 else 0
-                st.metric("Cost %", f"{cost_percentage:.2f}%")
-                st.metric("Net P&L", f"₹{completed_trades['net_pnl'].sum():,.2f}")
            
             # Setup Performance
             st.subheader("Setup Performance")
@@ -510,5 +368,4 @@ st.markdown("---")
 st.markdown("Built with ❤️ for traders who take journaling seriously")
 
 # Close the database connection
-conn.close()                     
-    
+conn.close()
