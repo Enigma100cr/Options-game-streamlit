@@ -73,7 +73,7 @@ def save_to_excel(trades_df):
         ])
         
         if row['entry_screenshot']:
-            img = Image.open(io.BytesIO(base64.b64decode(row['entry_screenshot'])))
+            img = Image.open(io.BytesIO(base64.b64decode(row['entry_screenshot']))
             img.thumbnail((200, 200))
             ws.add_image(ExcelImage(img), f'H{index+2}')
             
