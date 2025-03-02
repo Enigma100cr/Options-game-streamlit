@@ -73,19 +73,18 @@ def save_to_excel(trades_df):
         ])
         
         if row['entry_screenshot']:
-            img = Image.open(io.BytesIO(base64.b64decode(row['entry_screenshot'])))
+            img = Image.open(io.BytesIO(base64.b64decode(row['entry_screenshot'])))  # Fixed
             img.thumbnail((200, 200))
             ws.add_image(ExcelImage(img), f'H{index+2}')
             
         if row['exit_screenshot']:
-            img = Image.open(io.BytesIO(base64.b64decode(row['exit_screenshot']))
+            img = Image.open(io.BytesIO(base64.b64decode(row['exit_screenshot'])))  # Fixed
             img.thumbnail((200, 200))
             ws.add_image(ExcelImage(img), f'I{index+2}')
     
     excel_file = "trade_journal.xlsx"
     wb.save(excel_file)
     return excel_file
-
 # Main app
 st.title("📈 Professional Trading Journal & Analytics")
 st.markdown("---")
