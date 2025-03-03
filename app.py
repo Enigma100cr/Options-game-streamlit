@@ -143,7 +143,6 @@ with tabs[0]:  # Trade Journal
                     cols = st.columns([3,1])
                     with cols[0]:
                         st.write(f"**Entry:** ₹{trade['entry_price']} | **Exit:** ₹{trade['exit_price']}")
-                        st.write(f"**Size:** {trade['position_size']} | **Risk:** {trade['stop_loss']}")
                         st.write(f"**Net P&L:** ₹{trade['net_pnl']:,.2f}")
                         st.write(f"**Notes:** {trade['notes']}")
                     with cols[1]:
@@ -199,7 +198,7 @@ with tabs[1]:  # Position Calculator
             st.write(f"**Reward/Risk Ratio:** {reward_risk:.2f}:1")
 
 with tabs[2]:  # Analytics
-    st.subheader("📈 Performance Analytics")
+    st.subheader("📊 Performance Analytics")
     trades_df = pd.read_sql("SELECT * FROM trades WHERE user_id = ?", 
                           conn, params=(st.session_state.user_id,))
     
@@ -215,8 +214,16 @@ with tabs[2]:  # Analytics
             total_pnl = trades_df['net_pnl'].sum()
             st.metric("Total P&L", f"₹{total_pnl:,.2f}")
         
+        # Equity Curve
         st.plotly_chart(px.line(trades_df, x='date', y='net_pnl', title='Equity Curve'))
-        st.plotly_chart(px.pie(trades_df, names='status', title='Trade Status Distribution'))
+        
+        # Win Rate vs. Loss Rate
+        win_loss_df = trades_df.groupby(trades_df['net_pnl'] > 0).size().reset_index(name='count')
+        win_loss_df['result'] = win_loss_df['net_pnl'].apply(lambda x: 'Win' if x else 'Loss')
+        st.plotly_chart(px.pie(win_loss_df, names='result', values='count', title='Win Rate vs. Loss Rate'))
+        
+        # P&L Distribution
+        st.plotly_chart(px.histogram(trades_df, x='net_pnl', title='P&L Distribution'))
     else:
         st.info("No data available for analytics")
 
