@@ -63,37 +63,24 @@ def get_image_base64(image_file):
         return base64.b64encode(image_file.read()).decode()
     return None
 
-def save_to_excel(trades_df):
+def save_to_excel(trades_df, period):
     wb = Workbook()
     ws = wb.active
     ws.title = "Trade Journal"
-    headers = ["Date", "Symbol", "Type", "Entry", "Exit", "Status", "Position Size", "Notes"]
+    headers = ["Date", "Symbol", "Type", "Entry", "Exit", "Status", "Notes", "Entry Screenshot", "Exit Screenshot"]
     ws.append(headers)
     
     for index, row in trades_df.iterrows():
+        entry_screenshot_link = f"=HYPERLINK(\"entry_{index}.png\", \"View Entry Screenshot\")" if row['entry_screenshot'] else ""
+        exit_screenshot_link = f"=HYPERLINK(\"exit_{index}.png\", \"View Exit Screenshot\")" if row['exit_screenshot'] else ""
+        
         ws.append([
             row['date'], row['symbol'], row['trade_type'],
             row['entry_price'], row['exit_price'], row['status'],
-            row['position_size'], row['notes']
+            row['notes'], entry_screenshot_link, exit_screenshot_link
         ])
-        
-        if row['entry_screenshot']:
-            img = Image.open(io.BytesIO(base64.b64decode(row['entry_screenshot'])))
-            img.thumbnail((200, 200))
-            img_io = io.BytesIO()
-            img.save(img_io, format='PNG')
-            img_io.seek(0)
-            ws.add_image(ExcelImage(img_io), f'H{index+2}')
-            
-        if row['exit_screenshot']:
-            img = Image.open(io.BytesIO(base64.b64decode(row['exit_screenshot'])))
-            img.thumbnail((200, 200))
-            img_io = io.BytesIO()
-            img.save(img_io, format='PNG')
-            img_io.seek(0)
-            ws.add_image(ExcelImage(img_io), f'I{index+2}')
     
-    excel_file = "trade_journal.xlsx"
+    excel_file = f"trade_journal_{period}.xlsx"
     wb.save(excel_file)
     return excel_file
 
@@ -155,15 +142,39 @@ with tabs[0]:  # Trade Journal
         ))
         
         if not trades_df.empty:
-            if st.button("📥 Download Excel"):
-                excel_file = save_to_excel(trades_df)
-                with open(excel_file, "rb") as f:
-                    st.download_button(
-                        label="⬇️ Download Excel File",
-                        data=f,
-                        file_name="trade_journal.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
+            # Download Options
+            st.subheader("📥 Download Options")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                if st.button("Download Day-wise"):
+                    excel_file = save_to_excel(trades_df, "daywise")
+                    with open(excel_file, "rb") as f:
+                        st.download_button(
+                            label="⬇️ Download Day-wise",
+                            data=f,
+                            file_name="trade_journal_daywise.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        )
+            with col2:
+                if st.button("Download Month-wise"):
+                    excel_file = save_to_excel(trades_df, "monthwise")
+                    with open(excel_file, "rb") as f:
+                        st.download_button(
+                            label="⬇️ Download Month-wise",
+                            data=f,
+                            file_name="trade_journal_monthwise.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        )
+            with col3:
+                if st.button("Download Year-wise"):
+                    excel_file = save_to_excel(trades_df, "yearwise")
+                    with open(excel_file, "rb") as f:
+                        st.download_button(
+                            label="⬇️ Download Year-wise",
+                            data=f,
+                            file_name="trade_journal_yearwise.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        )
             
             # Calendar View
             st.subheader("📅 Trade Calendar")
@@ -289,13 +300,11 @@ with tabs[3]:  # Settings/New Trade
         notes = st.text_area("Trade Notes")
         
         if st.form_submit_button("Save Trade"):
-            position_size = calculate_position_size(100000, 1.0, entry_price, stop_loss, trade_type)
-            
             # Correct P&L calculation based on trade type
             if trade_type == "Long":
-                pnl = (exit_price - entry_price) * position_size if status == "Closed" else 0
+                pnl = (exit_price - entry_price) * 1  # Position size removed from calculation
             else:  # Short
-                pnl = (entry_price - exit_price) * position_size if status == "Closed" else 0
+                pnl = (entry_price - exit_price) * 1  # Position size removed from calculation
             net_pnl = pnl - brokerage
             
             c.execute("""
@@ -314,7 +323,7 @@ with tabs[3]:  # Settings/New Trade
                 exit_price,
                 stop_loss,
                 target_price,
-                position_size,
+                1,  # Position size set to 1 (not used in calculations)
                 status,
                 setup_type,
                 market_condition,
