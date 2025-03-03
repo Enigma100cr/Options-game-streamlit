@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS trades (
     exit_price REAL,
     stop_loss REAL,
     target REAL,
-    position_size INTEGER,
+    qty INTEGER,  -- Added Qty field
     status TEXT,
     setup_type TEXT,
     market_condition TEXT,
@@ -65,7 +65,7 @@ def save_to_excel(trades_df, period, start_date, end_date):
     wb = Workbook()
     ws = wb.active
     ws.title = "Trade Journal"
-    headers = ["Date", "Symbol", "Type", "Entry", "Exit", "Status", "Notes", "Entry Screenshot", "Exit Screenshot"]
+    headers = ["Date", "Symbol", "Type", "Entry", "Exit", "Qty", "Status", "Notes", "Entry Screenshot", "Exit Screenshot"]
     ws.append(headers)
     
     for index, row in trades_df.iterrows():
@@ -74,8 +74,8 @@ def save_to_excel(trades_df, period, start_date, end_date):
         
         ws.append([
             row['date'], row['symbol'], row['trade_type'],
-            row['entry_price'], row['exit_price'], row['status'],
-            row['notes'], entry_screenshot_link, exit_screenshot_link
+            row['entry_price'], row['exit_price'], row['qty'],
+            row['status'], row['notes'], entry_screenshot_link, exit_screenshot_link
         ])
     
     excel_file = f"trade_journal_{period}_{start_date}_{end_date}.xlsx"
@@ -186,6 +186,7 @@ with tabs[0]:  # Trade Journal
                     cols = st.columns([3,1])
                     with cols[0]:
                         st.write(f"**Entry:** ₹{trade['entry_price']} | **Exit:** ₹{trade['exit_price']}")
+                        st.write(f"**Qty:** {trade['qty']}")
                         st.write(f"**Net P&L:** ₹{trade['net_pnl']:,.2f}")
                         st.write(f"**Notes:** {trade['notes']}")
                     with cols[1]:
@@ -285,6 +286,7 @@ with tabs[3]:  # Settings/New Trade
             exit_price = st.number_input("Exit Price")
             stop_loss = st.number_input("Stop Loss")
             target_price = st.number_input("Target Price")
+            qty = st.number_input("Qty", min_value=1, value=1)  # Added Qty field
         
         with col2:
             status = st.selectbox("Status", ["Open", "Closed"])
@@ -299,18 +301,18 @@ with tabs[3]:  # Settings/New Trade
         if st.form_submit_button("Save Trade"):
             # Correct P&L calculation based on trade type
             if trade_type == "Long":
-                pnl = (exit_price - entry_price) * 1  # Position size removed from calculation
+                pnl = (exit_price - entry_price) * qty  # Qty used for P&L calculation
             else:  # Short
-                pnl = (entry_price - exit_price) * 1  # Position size removed from calculation
+                pnl = (entry_price - exit_price) * qty  # Qty used for P&L calculation
             net_pnl = pnl  # No brokerage
             
             c.execute("""
                 INSERT INTO trades (
                     user_id, date, symbol, trade_type, entry_price, exit_price,
-                    stop_loss, target, position_size, status, setup_type,
+                    stop_loss, target, qty, status, setup_type,
                     market_condition, psychology, notes, entry_screenshot,
                     exit_screenshot, net_pnl
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 st.session_state.user_id,
                 trade_date.strftime("%Y-%m-%d"),
@@ -320,7 +322,7 @@ with tabs[3]:  # Settings/New Trade
                 exit_price,
                 stop_loss,
                 target_price,
-                1,  # Position size set to 1 (not used in calculations)
+                qty,  # Added Qty field
                 status,
                 setup_type,
                 market_condition,
@@ -345,6 +347,7 @@ if 'edit_trade' in st.session_state:
             new_exit = st.number_input("Exit Price", value=trade['exit_price'])
             new_stop = st.number_input("Stop Loss", value=trade['stop_loss'])
             new_target = st.number_input("Target", value=trade['target'])
+            new_qty = st.number_input("Qty", value=trade['qty'], min_value=1)  # Added Qty field
         
         with col2:
             new_status = st.selectbox("Status", ["Open", "Closed"], index=0 if trade['status'] == "Open" else 1)
@@ -357,6 +360,7 @@ if 'edit_trade' in st.session_state:
                 exit_price = ?,
                 stop_loss = ?,
                 target = ?,
+                qty = ?,
                 status = ?,
                 notes = ?
                 WHERE id = ?
@@ -365,6 +369,7 @@ if 'edit_trade' in st.session_state:
                 new_exit,
                 new_stop,
                 new_target,
+                new_qty,  # Added Qty field
                 new_status,
                 new_notes,
                 trade['id']
