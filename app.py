@@ -7,7 +7,6 @@ import sqlite3
 import io
 from PIL import Image
 from openpyxl import Workbook
-from openpyxl.drawing.image import Image as ExcelImage
 import calendar
 
 # Database configuration
@@ -41,7 +40,6 @@ CREATE TABLE IF NOT EXISTS trades (
     notes TEXT,
     entry_screenshot BLOB,
     exit_screenshot BLOB,
-    brokerage REAL,
     net_pnl REAL,
     FOREIGN KEY(user_id) REFERENCES users(id)
 )
@@ -63,7 +61,7 @@ def get_image_base64(image_file):
         return base64.b64encode(image_file.read()).decode()
     return None
 
-def save_to_excel(trades_df, period):
+def save_to_excel(trades_df, period, start_date, end_date):
     wb = Workbook()
     ws = wb.active
     ws.title = "Trade Journal"
@@ -80,7 +78,7 @@ def save_to_excel(trades_df, period):
             row['notes'], entry_screenshot_link, exit_screenshot_link
         ])
     
-    excel_file = f"trade_journal_{period}.xlsx"
+    excel_file = f"trade_journal_{period}_{start_date}_{end_date}.xlsx"
     wb.save(excel_file)
     return excel_file
 
@@ -147,7 +145,7 @@ with tabs[0]:  # Trade Journal
             col1, col2, col3 = st.columns(3)
             with col1:
                 if st.button("Download Day-wise"):
-                    excel_file = save_to_excel(trades_df, "daywise")
+                    excel_file = save_to_excel(trades_df, "daywise", start_date, end_date)
                     with open(excel_file, "rb") as f:
                         st.download_button(
                             label="⬇️ Download Day-wise",
@@ -157,7 +155,7 @@ with tabs[0]:  # Trade Journal
                         )
             with col2:
                 if st.button("Download Month-wise"):
-                    excel_file = save_to_excel(trades_df, "monthwise")
+                    excel_file = save_to_excel(trades_df, "monthwise", start_date, end_date)
                     with open(excel_file, "rb") as f:
                         st.download_button(
                             label="⬇️ Download Month-wise",
@@ -167,7 +165,7 @@ with tabs[0]:  # Trade Journal
                         )
             with col3:
                 if st.button("Download Year-wise"):
-                    excel_file = save_to_excel(trades_df, "yearwise")
+                    excel_file = save_to_excel(trades_df, "yearwise", start_date, end_date)
                     with open(excel_file, "rb") as f:
                         st.download_button(
                             label="⬇️ Download Year-wise",
@@ -296,7 +294,6 @@ with tabs[3]:  # Settings/New Trade
             entry_screenshot = st.file_uploader("Entry Screenshot", type=["png", "jpg", "jpeg"])
             exit_screenshot = st.file_uploader("Exit Screenshot", type=["png", "jpg", "jpeg"])
         
-        brokerage = st.number_input("Brokerage", value=0.0)
         notes = st.text_area("Trade Notes")
         
         if st.form_submit_button("Save Trade"):
@@ -305,15 +302,15 @@ with tabs[3]:  # Settings/New Trade
                 pnl = (exit_price - entry_price) * 1  # Position size removed from calculation
             else:  # Short
                 pnl = (entry_price - exit_price) * 1  # Position size removed from calculation
-            net_pnl = pnl - brokerage
+            net_pnl = pnl  # No brokerage
             
             c.execute("""
                 INSERT INTO trades (
                     user_id, date, symbol, trade_type, entry_price, exit_price,
                     stop_loss, target, position_size, status, setup_type,
                     market_condition, psychology, notes, entry_screenshot,
-                    exit_screenshot, brokerage, net_pnl
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    exit_screenshot, net_pnl
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 st.session_state.user_id,
                 trade_date.strftime("%Y-%m-%d"),
@@ -331,7 +328,6 @@ with tabs[3]:  # Settings/New Trade
                 notes,
                 get_image_base64(entry_screenshot),
                 get_image_base64(exit_screenshot),
-                brokerage,
                 net_pnl
             ))
             conn.commit()
@@ -353,7 +349,6 @@ if 'edit_trade' in st.session_state:
         with col2:
             new_status = st.selectbox("Status", ["Open", "Closed"], index=0 if trade['status'] == "Open" else 1)
             new_notes = st.text_area("Notes", value=trade['notes'])
-            new_brokerage = st.number_input("Brokerage", value=trade['brokerage'])
         
         if st.form_submit_button("Save Changes"):
             c.execute("""
@@ -363,8 +358,7 @@ if 'edit_trade' in st.session_state:
                 stop_loss = ?,
                 target = ?,
                 status = ?,
-                notes = ?,
-                brokerage = ?
+                notes = ?
                 WHERE id = ?
             """, (
                 new_entry,
@@ -373,7 +367,6 @@ if 'edit_trade' in st.session_state:
                 new_target,
                 new_status,
                 new_notes,
-                new_brokerage,
                 trade['id']
             ))
             conn.commit()
