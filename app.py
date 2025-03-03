@@ -101,107 +101,13 @@ st.set_page_config(page_title="Professional Trading Journal", layout="wide")
 st.title(f"📈 Trading Journal")
 st.markdown("---")
 
-# Tabs setup
-tabs = st.tabs(["📝 Trade Journal", "🧮 Position Calculator", "📊 Analytics", "⚙️ Settings"])
+# Dashboard Sections
+st.sidebar.title("Dashboard")
+dashboard_section = st.sidebar.radio("Navigate", ["Stats", "Calendar", "Settings", "Help"])
 
-with tabs[0]:  # Trade Journal
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        st.subheader("🔍 Filter Trades")
-        start_date = st.date_input("Start Date", datetime.today())
-        end_date = st.date_input("End Date", datetime.today())
-        selected_symbol = st.text_input("Filter by Symbol")
-    
-    with col2:
-        st.subheader("📜 Trade History")
-        query = """
-            SELECT * FROM trades 
-            WHERE date BETWEEN ? AND ?
-            AND symbol LIKE ?
-            AND user_id = ?
-        """
-        trades_df = pd.read_sql(query, conn, params=(
-            start_date.strftime("%Y-%m-%d"),
-            end_date.strftime("%Y-%m-%d"),
-            f"%{selected_symbol}%",
-            st.session_state.user_id
-        ))
-        
-        if not trades_df.empty:
-            if st.button("📥 Download Excel"):
-                excel_file = save_to_excel(trades_df)
-                with open(excel_file, "rb") as f:
-                    st.download_button(
-                        label="⬇️ Download Excel File",
-                        data=f,
-                        file_name="trade_journal.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
-            
-            for _, trade in trades_df.iterrows():
-                with st.expander(f"{trade['symbol']} - {trade['date']} - {trade['status']}"):
-                    cols = st.columns([3,1])
-                    with cols[0]:
-                        st.write(f"**Entry:** ₹{trade['entry_price']} | **Exit:** ₹{trade['exit_price']}")
-                        st.write(f"**Net P&L:** ₹{trade['net_pnl']:,.2f}")
-                        st.write(f"**Notes:** {trade['notes']}")
-                    with cols[1]:
-                        if trade['entry_screenshot']:
-                            st.image(base64.b64decode(trade['entry_screenshot']), use_column_width=True)
-                        if st.button("✏️ Edit", key=f"edit_{trade['id']}"):
-                            st.session_state.edit_trade = trade
-                        if st.button("🗑️ Delete", key=f"delete_{trade['id']}"):
-                            c.execute("DELETE FROM trades WHERE id=?", (trade['id'],))
-                            conn.commit()
-                            st.rerun()
-        else:
-            st.info("No trades found for selected filters")
-
-with tabs[1]:  # Position Calculator
-    st.subheader("📐 Position Size Calculator")
-    
-    calc_col1, calc_col2 = st.columns(2)
-    with calc_col1:
-        st.markdown("### Long Position")
-        long_entry = st.number_input("Entry Price", value=100.0, key="long_entry")
-        long_stop = st.number_input("Stop Loss", value=80.0, key="long_stop")
-        long_target = st.number_input("Target Price", value=150.0, key="long_target")
-        long_risk = st.number_input("Risk (%)", value=2.0, key="long_risk")
-        long_capital = st.number_input("Capital", value=100000.0, key="long_capital")
-        
-        if st.button("Calculate Long"):
-            position_size = calculate_position_size(long_capital, long_risk, long_entry, long_stop, "Long")
-            risk_amount = long_capital * (long_risk / 100)
-            reward_risk = (long_target - long_entry) / (long_entry - long_stop)
-            
-            st.markdown("### Results")
-            st.write(f"**Position Size:** {position_size}")
-            st.write(f"**Risk Amount:** ₹{risk_amount:,.2f}")
-            st.write(f"**Reward/Risk Ratio:** {reward_risk:.2f}:1")
-    
-    with calc_col2:
-        st.markdown("### Short Position")
-        short_entry = st.number_input("Entry Price", value=200.0, key="short_entry")
-        short_stop = st.number_input("Stop Loss", value=220.0, key="short_stop")
-        short_target = st.number_input("Target Price", value=140.0, key="short_target")
-        short_risk = st.number_input("Risk (%)", value=2.0, key="short_risk")
-        short_capital = st.number_input("Capital", value=50000.0, key="short_capital")
-        
-        if st.button("Calculate Short"):
-            position_size = calculate_position_size(short_capital, short_risk, short_entry, short_stop, "Short")
-            risk_amount = short_capital * (short_risk / 100)
-            reward_risk = (short_entry - short_target) / (short_stop - short_entry)
-            
-            st.markdown("### Results")
-            st.write(f"**Position Size:** {position_size}")
-            st.write(f"**Risk Amount:** ₹{risk_amount:,.2f}")
-            st.write(f"**Reward/Risk Ratio:** {reward_risk:.2f}:1")
-
-with tabs[2]:  # Analytics
-    st.subheader("📊 Performance Analytics")
-    trades_df = pd.read_sql("SELECT * FROM trades WHERE user_id = ?", 
-                          conn, params=(st.session_state.user_id,))
-    
+if dashboard_section == "Stats":
+    st.subheader("📊 Stats")
+    trades_df = pd.read_sql("SELECT * FROM trades WHERE user_id = ?", conn, params=(st.session_state.user_id,))
     if not trades_df.empty:
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -214,22 +120,28 @@ with tabs[2]:  # Analytics
             total_pnl = trades_df['net_pnl'].sum()
             st.metric("Total P&L", f"₹{total_pnl:,.2f}")
         
-        # Equity Curve
         st.plotly_chart(px.line(trades_df, x='date', y='net_pnl', title='Equity Curve'))
-        
-        # Win Rate vs. Loss Rate
-        win_loss_df = trades_df.groupby(trades_df['net_pnl'] > 0).size().reset_index(name='count')
-        win_loss_df['result'] = win_loss_df['net_pnl'].apply(lambda x: 'Win' if x else 'Loss')
-        st.plotly_chart(px.pie(win_loss_df, names='result', values='count', title='Win Rate vs. Loss Rate'))
-        
-        # P&L Distribution
-        st.plotly_chart(px.histogram(trades_df, x='net_pnl', title='P&L Distribution'))
     else:
-        st.info("No data available for analytics")
+        st.info("No data available for stats")
 
-with tabs[3]:  # Settings/New Trade
+elif dashboard_section == "Calendar":
+    st.subheader("📅 Calendar")
+    st.write("Calendar view of trades will be displayed here.")
+
+elif dashboard_section == "Settings":
+    st.subheader("⚙️ Settings")
+    st.write("User settings and preferences can be configured here.")
+
+elif dashboard_section == "Help":
+    st.subheader("❓ Help")
+    st.write("Help and support information will be provided here.")
+
+# New Trade Section
+st.sidebar.title("New Trade")
+new_trade_section = st.sidebar.radio("New Trade", ["New Setup", "New Note"])
+
+if new_trade_section == "New Setup":
     st.subheader("➕ New Trade Entry")
-    
     with st.form("new_trade_form"):
         col1, col2 = st.columns(2)
         with col1:
@@ -287,48 +199,11 @@ with tabs[3]:  # Settings/New Trade
             conn.commit()
             st.success("Trade saved successfully!")
 
-# Edit Trade Modal
-if 'edit_trade' in st.session_state:
-    trade = st.session_state.edit_trade
-    with st.form("edit_trade_form"):
-        st.subheader("Edit Trade")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            new_entry = st.number_input("Entry Price", value=trade['entry_price'])
-            new_exit = st.number_input("Exit Price", value=trade['exit_price'])
-            new_stop = st.number_input("Stop Loss", value=trade['stop_loss'])
-            new_target = st.number_input("Target", value=trade['target'])
-        
-        with col2:
-            new_status = st.selectbox("Status", ["Open", "Closed"], index=0 if trade['status'] == "Open" else 1)
-            new_notes = st.text_area("Notes", value=trade['notes'])
-            new_brokerage = st.number_input("Brokerage", value=trade['brokerage'])
-        
-        if st.form_submit_button("Save Changes"):
-            c.execute("""
-                UPDATE trades SET
-                entry_price = ?,
-                exit_price = ?,
-                stop_loss = ?,
-                target = ?,
-                status = ?,
-                notes = ?,
-                brokerage = ?
-                WHERE id = ?
-            """, (
-                new_entry,
-                new_exit,
-                new_stop,
-                new_target,
-                new_status,
-                new_notes,
-                new_brokerage,
-                trade['id']
-            ))
-            conn.commit()
-            del st.session_state.edit_trade
-            st.rerun()
+elif new_trade_section == "New Note":
+    st.subheader("📝 New Note")
+    note = st.text_area("Add a new note")
+    if st.button("Save Note"):
+        st.success("Note saved successfully!")
 
 # Footer
 st.markdown("---")
