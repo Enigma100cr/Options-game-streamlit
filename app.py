@@ -84,8 +84,8 @@ def save_to_excel(trades_df, period, start_date, end_date):
                 f.write(base64.b64decode(row['exit_screenshot']))
         
         # Add hyperlinks to the Excel file
-        entry_screenshot_link = f"=HYPERLINK(\"{entry_screenshot_path}\", \"View Entry Screenshot\")" if row['entry_screenshot'] else ""
-        exit_screenshot_link = f"=HYPERLINK(\"{exit_screenshot_path}\", \"View Exit Screenshot\")" if row['exit_screenshot'] else ""
+        entry_screenshot_link = f'=HYPERLINK("{entry_screenshot_path}", "View Entry Screenshot")' if row['entry_screenshot'] else ""
+        exit_screenshot_link = f'=HYPERLINK("{exit_screenshot_path}", "View Exit Screenshot")' if row['exit_screenshot'] else ""
         
         ws.append([
             row['date'], row['symbol'], row['trade_type'],
@@ -215,9 +215,9 @@ with tabs[0]:  # Trade Journal
                         st.write(f"**Notes:** {trade['notes']}")
                     with cols[1]:
                         if trade['entry_screenshot']:
-                            st.image(base64.b64decode(trade['entry_screenshot']), use_column_width=True)
+                            st.image(base64.b64decode(trade['entry_screenshot']), use_container_width=True)
                         if trade['exit_screenshot']:
-                            st.image(base64.b64decode(trade['exit_screenshot']), use_column_width=True)
+                            st.image(base64.b64decode(trade['exit_screenshot']), use_container_width=True)
                         if st.button("✏️ Edit", key=f"edit_{trade['id']}"):
                             st.session_state.edit_trade = trade
                         if st.button("🗑️ Delete", key=f"delete_{trade['id']}"):
