@@ -4,8 +4,7 @@ from datetime import datetime
 import plotly.express as px
 import base64
 import sqlite3
-import io
-from PIL import Image
+import os
 from openpyxl import Workbook
 import calendar
 
@@ -68,9 +67,25 @@ def save_to_excel(trades_df, period, start_date, end_date):
     headers = ["Date", "Symbol", "Type", "Entry", "Exit", "Qty", "Status", "Notes", "Entry Screenshot", "Exit Screenshot"]
     ws.append(headers)
     
+    # Create a directory to store screenshots
+    screenshot_dir = f"screenshots_{period}_{start_date}_{end_date}"
+    os.makedirs(screenshot_dir, exist_ok=True)
+    
     for index, row in trades_df.iterrows():
-        entry_screenshot_link = f"=HYPERLINK(\"entry_{index}.png\", \"View Entry Screenshot\")" if row['entry_screenshot'] else ""
-        exit_screenshot_link = f"=HYPERLINK(\"exit_{index}.png\", \"View Exit Screenshot\")" if row['exit_screenshot'] else ""
+        entry_screenshot_path = os.path.join(screenshot_dir, f"entry_{index}.png")
+        exit_screenshot_path = os.path.join(screenshot_dir, f"exit_{index}.png")
+        
+        # Save screenshots as images
+        if row['entry_screenshot']:
+            with open(entry_screenshot_path, "wb") as f:
+                f.write(base64.b64decode(row['entry_screenshot']))
+        if row['exit_screenshot']:
+            with open(exit_screenshot_path, "wb") as f:
+                f.write(base64.b64decode(row['exit_screenshot']))
+        
+        # Add hyperlinks to the Excel file
+        entry_screenshot_link = f"=HYPERLINK(\"{entry_screenshot_path}\", \"View Entry Screenshot\")" if row['entry_screenshot'] else ""
+        exit_screenshot_link = f"=HYPERLINK(\"{exit_screenshot_path}\", \"View Exit Screenshot\")" if row['exit_screenshot'] else ""
         
         ws.append([
             row['date'], row['symbol'], row['trade_type'],
@@ -80,7 +95,7 @@ def save_to_excel(trades_df, period, start_date, end_date):
     
     excel_file = f"trade_journal_{period}_{start_date}_{end_date}.xlsx"
     wb.save(excel_file)
-    return excel_file
+    return excel_file, screenshot_dir
 
 # Function to generate calendar view
 def generate_calendar_view(trades_df, year, month):
@@ -144,8 +159,11 @@ with tabs[0]:  # Trade Journal
             st.subheader("📥 Download Options")
             col1, col2, col3 = st.columns(3)
             with col1:
+                st.write("**Day-wise Download**")
+                day_start = st.date_input("Start Date (Day-wise)", datetime.today(), key="day_start")
+                day_end = st.date_input("End Date (Day-wise)", datetime.today(), key="day_end")
                 if st.button("Download Day-wise"):
-                    excel_file = save_to_excel(trades_df, "daywise", start_date, end_date)
+                    excel_file, screenshot_dir = save_to_excel(trades_df, "daywise", day_start, day_end)
                     with open(excel_file, "rb") as f:
                         st.download_button(
                             label="⬇️ Download Day-wise",
@@ -154,8 +172,11 @@ with tabs[0]:  # Trade Journal
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                         )
             with col2:
+                st.write("**Month-wise Download**")
+                month_start = st.date_input("Start Date (Month-wise)", datetime.today(), key="month_start")
+                month_end = st.date_input("End Date (Month-wise)", datetime.today(), key="month_end")
                 if st.button("Download Month-wise"):
-                    excel_file = save_to_excel(trades_df, "monthwise", start_date, end_date)
+                    excel_file, screenshot_dir = save_to_excel(trades_df, "monthwise", month_start, month_end)
                     with open(excel_file, "rb") as f:
                         st.download_button(
                             label="⬇️ Download Month-wise",
@@ -164,8 +185,11 @@ with tabs[0]:  # Trade Journal
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                         )
             with col3:
+                st.write("**Year-wise Download**")
+                year_start = st.date_input("Start Date (Year-wise)", datetime.today(), key="year_start")
+                year_end = st.date_input("End Date (Year-wise)", datetime.today(), key="year_end")
                 if st.button("Download Year-wise"):
-                    excel_file = save_to_excel(trades_df, "yearwise", start_date, end_date)
+                    excel_file, screenshot_dir = save_to_excel(trades_df, "yearwise", year_start, year_end)
                     with open(excel_file, "rb") as f:
                         st.download_button(
                             label="⬇️ Download Year-wise",
