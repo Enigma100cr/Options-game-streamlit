@@ -391,4 +391,4 @@ if 'edit_trade' in st.session_state:
 
 # Footer
 st.markdown("---")
-st.markdown("©
+st.markdown("© 2023 Trading Journal App. All rights reserved.")
