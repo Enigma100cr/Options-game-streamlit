@@ -48,7 +48,6 @@ CREATE TABLE IF NOT EXISTS trades (
     exit_screenshot BLOB,
     net_pnl REAL,
     FOREIGN KEY(user_id) REFERENCES users(id)
-)
 """)
 conn.commit()
 
@@ -513,4 +512,4 @@ else:
 
 # Footer
 st.markdown("---")
-st.markdown("© 2025 MINDFLEX FINVENTURE Trading Journal App. All rights reserved.")
+st.markdown("© 2025 Trading Journal App. All rights reserved.")
