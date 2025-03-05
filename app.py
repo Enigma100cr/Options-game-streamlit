@@ -512,4 +512,4 @@ else:
 
 # Footer
 st.markdown("---")
-st.markdown("© 2025 Trading Journal App. All rights reserved.")
+st.markdown("© 2023 Trading Journal App. All rights reserved.")
