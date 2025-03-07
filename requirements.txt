@@ -1,7 +1,7 @@
 streamlit
 pandas
 plotly
-sqlite3
+sqlalchemy
 openpyxl
 fpdf
 Pillow
